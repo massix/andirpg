@@ -1,0 +1,9 @@
+**/*.o
+*.exe
+.cache/
+compile_commands.json
+*.log
+.xmake/
+build/
+.luarc.json
+

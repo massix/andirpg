@@ -1,0 +1,27 @@
+InlayHints:
+  BlockEnd: true
+  Enabled: true
+
+Diagnostics:
+  ClangTidy:
+    Add: [ modernize*, readability-identifier*, performance*, bugprone*, portability*, llvm-* ]
+    CheckOptions:
+      portability-restrict-system-includes.Includes: '*'
+      readability-identifier-naming.AggressiveDependentMemberLookup: true
+      readability-identifier-naming.VariableCase: lower_case
+      readability-identifier-naming.FunctionCase: lower_case
+      readability-identifier-naming.EnumCase: CamelCase
+      readability-identifier-naming.StructCase: CamelCase
+      readability-identifier-naming.TypedefCase: CamelCase
+      readability-identifier-length.IgnoredVariableNames: x|y
+      readability-identifier-length.IgnoredParameterNames: x|y
+      readability-identifier-length.IgnoredLoopCounterNames: i|x|y
+  UnusedIncludes: Strict
+  MissingIncludes: Strict
+
+Hover:
+  ShowAKA: Yes
+
+Index:
+  StandardLibrary: Yes
+  Background: Build

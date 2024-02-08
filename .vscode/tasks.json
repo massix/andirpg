@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "type": "shell",
+  "command": "xmake",
+  "workdir": "${workspaceFolder}",
+  "tasks": [
+    {
+      "label": "Build",
+      "args": ["b"],
+      "group": "build",
+      "isBackground": false
+    },
+    {
+      "label": "Clean",
+      "args": ["c"],
+      "group": "build",
+      "isBackground": false
+    },
+    {
+      "label": "Run Tests",
+      "args": ["r", "-w", ".", "test"],
+      "group": "test",
+      "isBackground": false,
+      "dependsOn": "Build"
+    },
+    {
+      "label": "Watch Build",
+      "args": ["watch"],
+      "group": "build",
+      "isBackground": true
+    }
+  ]
+}
