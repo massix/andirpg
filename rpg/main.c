@@ -3,8 +3,8 @@
 #include "entity.h"
 #include "logger.h"
 #include "map.h"
+#include "ui/map_window.h"
 #include <ncurses.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -25,12 +25,14 @@ void print_player_info(Engine *engine, WINDOW *window) {
 int main(int argc, char *argv[]) {
   srandom(time(nullptr));
   Configuration *configuration = init_configuration();
-  WINDOW        *main_window = init_ncurses();
-  Engine        *engine = init_game(configuration);
+  init_ncurses();
+  Engine *engine = init_game(configuration);
   logger_new(configuration_get_log_output_file(configuration), configuration_get_log_level(configuration));
   LOG_INFO("Beginning game", 0);
 
-  map_wdraw(engine_get_map(engine), main_window);
+  // The MapWindow should cover the whole height of the screen and a third of it
+  MapWindow *map_window = map_window_new(engine_get_map(engine), LINES, COLS / 3, 3, 3);
+  map_window_draw(map_window);
 
   // Print HP of the player
   MapBoundaries boundaries = map_get_boundaries(engine_get_map(engine));
@@ -42,7 +44,7 @@ int main(int argc, char *argv[]) {
   while ((key = getch()) != 'q') {
     engine_handle_keypress(engine, key);
     engine_move_all_entities(engine);
-    map_wdraw(engine_get_map(engine), main_window);
+    map_window_draw(map_window);
     print_player_info(engine, w_player_info);
   }
 
