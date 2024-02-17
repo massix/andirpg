@@ -1,6 +1,7 @@
 #include "map.h"
 #include "entity.h"
 #include "item.h"
+#include "logger.h"
 #include "point.h"
 #include "utils.h"
 #include <ncurses.h>
@@ -298,22 +299,23 @@ void map_fdraw(Map *map, FILE *output) {
 }
 
 void map_wdraw(Map *map, WINDOW *window) {
-  wmove(window, LINES - 1, 0);
-  if (LINES < map->_y_size) {
-    wprintw(window, "Cannot draw map, screen is too small!");
+  wmove(window, 0, 0);
+  int max_x = window->_maxx - window->_begx;
+  int max_y = window->_maxy - window->_begy;
+
+  if (max_y < map->_y_size) {
+    LOG_ERROR("Cannot draw map, screen (y: %d < %d) is too small!", max_y, map->_y_size);
     return;
   }
 
-  if (COLS < map->_x_size) {
-    wprintw(window, "Cannot draw map, screen is too small!");
+  if (max_x < map->_x_size) {
+    LOG_ERROR("Cannot draw map, screen (x: %d < %d) is too small!", max_x, map->_x_size);
     return;
   }
+
+  LOG_INFO("Drawing map on a %dx%d window", max_x, max_y);
 
   char **matrix = generate_matrix(map);
-
-  wclear(window);
-  wmove(window, LINES - 1, 10);
-  wprintw(window, "Drawing map on a %dx%d wide screen", LINES, COLS);
 
   for (int y = 0; y < map->_y_size; y++) {
     for (int x = 0; x < map->_x_size; x++) {
