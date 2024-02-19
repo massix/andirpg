@@ -300,8 +300,9 @@ void map_fdraw(Map *map, FILE *output) {
 
 void map_wdraw(Map *map, WINDOW *window) {
   wmove(window, 0, 0);
-  int max_x = window->_maxx - window->_begx;
-  int max_y = window->_maxy - window->_begy;
+  int max_x;
+  int max_y;
+  getmaxyx(window, max_y, max_x);
 
   if (max_y < map->_y_size) {
     LOG_ERROR("Cannot draw map, screen (y: %d < %d) is too small!", max_y, map->_y_size);
@@ -313,9 +314,10 @@ void map_wdraw(Map *map, WINDOW *window) {
     return;
   }
 
-  LOG_INFO("Drawing map on a %dx%d window", max_x, max_y);
+  LOG_DEBUG("Drawing map on a %dx%d window", max_x, max_y);
 
   char **matrix = generate_matrix(map);
+  wclear(window);
 
   for (int y = 0; y < map->_y_size; y++) {
     for (int x = 0; x < map->_x_size; x++) {

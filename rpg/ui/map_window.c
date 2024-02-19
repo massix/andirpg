@@ -41,8 +41,7 @@ MapWindow *map_window_new(Map *map, int lines, int cols, int x, int y) {
 
   // Before you ask: no, it is not a bug. NCurses has `y` and `x` reversed.
   ret->_window = newwin(ret->_lines, ret->_cols, y, x);
-  ret->_window->_parent = stdscr;
-  ret->_inner_window = subwin(ret->_window, boundaries.y + 2, boundaries.x + 2, y + 1, x + 1);
+  ret->_inner_window = subwin(ret->_window, boundaries.y, boundaries.x, 1, 1);
   ret->_map = map;
 
   return ret;
@@ -63,19 +62,20 @@ void map_window_draw_borders(MapWindow *map_window) {
 
   int cur_x = 0;
   int cur_y = 0;
-  int max_x = map_window->_window->_maxx - map_window->_window->_begx;
-  int max_y = (map_window->_window->_maxy - map_window->_window->_begy);
+  int max_x;
+  int max_y;
+  getmaxyx(map_window->_window, max_y, max_x);
   LOG_DEBUG("max_x: %d and max_y: %d", max_x, max_y);
 
   // These are the four corners
   mvwaddch(map_window->_window, 0, 0, '+');
-  mvwaddch(map_window->_window, 0, max_x, '+');
-  mvwaddch(map_window->_window, max_y, 0, '+');
-  mvwaddch(map_window->_window, max_y, max_x, '+');
+  mvwaddch(map_window->_window, 0, max_x - 1, '+');
+  mvwaddch(map_window->_window, max_y - 1, 0, '+');
+  mvwaddch(map_window->_window, max_y - 1, max_x - 1, '+');
 
   // from top-left to top-right
   cur_x = 0;
-  while (cur_x < max_x - 1) {
+  while (cur_x < max_x - 2) {
     cur_x++;
     mvwaddch(map_window->_window, 0, cur_x, '-');
   }
@@ -83,7 +83,7 @@ void map_window_draw_borders(MapWindow *map_window) {
   // from top-left to bottom-left
   cur_y = 0;
   wmove(map_window->_window, 0, 0);
-  while (cur_y < max_y - 1) {
+  while (cur_y < max_y - 2) {
     cur_y++;
     mvwaddch(map_window->_window, cur_y, 0, '|');
   }
@@ -91,24 +91,24 @@ void map_window_draw_borders(MapWindow *map_window) {
   // from bottom_left to bottom_right
   cur_x = 0;
   wmove(map_window->_window, max_y, cur_x);
-  while (cur_x < max_x - 1) {
+  while (cur_x < max_x - 2) {
     cur_x++;
-    mvwaddch(map_window->_window, max_y, cur_x, '-');
+    mvwaddch(map_window->_window, max_y - 1, cur_x, '-');
   }
 
   // from bottom_right to top-right
   cur_y = 0;
   wmove(map_window->_window, 0, max_x);
-  while (cur_y < max_y - 1) {
+  while (cur_y < max_y - 2) {
     cur_y++;
-    mvwaddch(map_window->_window, cur_y, max_x, '|');
+    mvwaddch(map_window->_window, cur_y, max_x - 1, '|');
   }
 
   // now draw the name of the map (for now it is hardcoded)
   // TODO: take the name of the map from the map object
   const char *map_name = "[ Rimini Centro ]";
   uint32_t    map_name_length = strlen(map_name);
-  mvwprintw(map_window->_window, 0, max_x - 1 - map_name_length, "%s", map_name);
+  mvwprintw(map_window->_window, 0, max_x - map_name_length - 3, "%s", map_name);
   wrefresh(map_window->_window);
 }
 
