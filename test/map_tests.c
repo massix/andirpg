@@ -5,6 +5,7 @@
 #include <CUnit/CUnit.h>
 #include <CUnit/TestDB.h>
 #include <entity.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -169,39 +170,6 @@ void map_entities_test(void) {
   map_free(map);
 }
 
-void map_draw_test(void) {
-  const char *test_file = "test.txt";
-  Map        *map = map_new(5, 5, 10);
-
-  // Populate the map
-  map_add_entity(map, entity_new(30, HUMAN, "h1", 2, 0));
-  map_add_entity(map, entity_new(30, INHUMAN, "v1", 1, 1));
-  map_add_entity(map, entity_new(30, TREE, "t1", 0, 0));
-  map_add_entity(map, entity_new(30, ANIMAL, "a1", 3, 4));
-  map_add_entity(map, entity_new(10, INHUMAN, "v2", 0, 2));
-  map_add_entity(map, entity_new(1, MOUNTAIN, "m1", 2, 2));
-  map_add_entity(map, entity_new(1, MOUNTAIN, "m2", 3, 2));
-  map_add_entity(map, entity_new(1, MOUNTAIN, "m2", 4, 2));
-
-  FILE *input_file = fopen(test_file, "w");
-  char *content = calloc(1024, sizeof(char));
-  map_fdraw(map, input_file);
-  fflush(input_file);
-  fclose(input_file);
-
-  input_file = fopen(test_file, "r");
-  fread(content, sizeof(char), 1024, input_file);
-  CU_ASSERT_TRUE(strings_equal(content, "%.@..\n"
-                                        ".&...\n"
-                                        "&.^^^\n"
-                                        ".....\n"
-                                        "...#.\n"));
-  fclose(input_file);
-
-  unlink(test_file);
-  map_free(map);
-}
-
 void map_items_test(void) {
   Map *map = map_new(20, 20, 20);
   CU_ASSERT_FALSE(map_contains_item(map, "Non existing"));
@@ -235,7 +203,6 @@ void map_test_suite() {
   CU_add_test(suite, "Creation", &map_creation_test);
   CU_add_test(suite, "Handle Entities", &map_entities_test);
   CU_add_test(suite, "Handle Items", &map_items_test);
-  CU_add_test(suite, "Draw on screen", &map_draw_test);
   CU_add_test(suite, "Serialization", &map_dump_test);
 }
 

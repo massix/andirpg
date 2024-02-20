@@ -1,121 +1,120 @@
 #include "map_window.h"
+#include "boxed_window.h"
+#include "entity.h"
 #include "logger.h"
 #include "map.h"
+#include "point.h"
 #include "ui_point.h"
 #include <ncurses.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 
 struct MapWindow {
-  WINDOW  *_window;
-  WINDOW  *_inner_window;
-  Map     *_map; // This map is owned by an engine, we *must not* free it!
-  UiPoint *_ui_point;
-  int      _lines;
-  int      _cols;
+  BoxedWindow *_window;
+  Map         *_map; // This map is owned by an engine, we *must not* free it!
+  UiPoint     *_ui_point;
 };
 
 bool map_window_check_win_size(Map *map, int lines, int cols) {
   MapBoundaries map_boundaries = map_get_boundaries(map);
-  bool          lines_ok = lines > map_boundaries.y + 2;
-  bool          cols_ok = cols > map_boundaries.x + 2;
+
+  bool lines_ok = lines > map_boundaries.y + 2;
+  bool cols_ok = cols > map_boundaries.x + 2;
 
   return lines_ok && cols_ok;
 }
 
 MapWindow *map_window_new(Map *map, int lines, int cols, int x, int y) {
-  MapWindow    *ret = calloc(1, sizeof(MapWindow));
-  MapBoundaries boundaries = map_get_boundaries(map);
-  LOG_INFO("Creating map window (%dx%d)", lines, cols);
-
   if (!map_window_check_win_size(map, lines, cols)) {
     LOG_CRITICAL("Winsize (%dx%d) is too small to draw map and border", cols, lines);
-    free(ret);
     return nullptr;
   }
 
-  ret->_ui_point = ui_point_new(x, y);
-  ret->_cols = cols;
-  ret->_lines = lines;
+  MapWindow *ret = calloc(1, sizeof(MapWindow));
+  LOG_INFO("Creating map window (%dx%d)", lines, cols);
 
-  // Before you ask: no, it is not a bug. NCurses has `y` and `x` reversed.
-  ret->_window = newwin(ret->_lines, ret->_cols, y, x);
-  ret->_inner_window = subwin(ret->_window, boundaries.y, boundaries.x, 1, 1);
+  struct BoxedWindowOptions bwo;
+  boxed_window_options_default(&bwo);
+
+  ret->_ui_point = ui_point_new(x, y);
+
   ret->_map = map;
+  ret->_window = boxed_window_new(&bwo, "Rimini Centro", lines, cols, y, x, nullptr);
 
   return ret;
 }
 
 inline WINDOW *map_window_get_ncurses_window(MapWindow *map_window) {
-  return map_window->_window;
+  return nullptr;
 }
 
-void map_window_draw_borders(MapWindow *map_window) {
-  // clang-format off
-  LOG_DEBUG("Drawing borders: %d, %d, %d, %d",
-            map_window->_window->_begx,
-            map_window->_window->_begy,
-            map_window->_window->_maxx,
-            map_window->_window->_maxy);
-  // clang-format on
+char **map_window_generate_matrix(MapWindow *mpw) {
+  char        **matrix;
+  MapBoundaries boundaries = map_get_boundaries(mpw->_map);
+  uint32_t      entities_size = map_count_entities(mpw->_map);
+  Entity      **all_entities = map_get_all_entities(mpw->_map);
 
-  int cur_x = 0;
-  int cur_y = 0;
-  int max_x;
-  int max_y;
-  getmaxyx(map_window->_window, max_y, max_x);
-  LOG_DEBUG("max_x: %d and max_y: %d", max_x, max_y);
-
-  // These are the four corners
-  mvwaddch(map_window->_window, 0, 0, '+');
-  mvwaddch(map_window->_window, 0, max_x - 1, '+');
-  mvwaddch(map_window->_window, max_y - 1, 0, '+');
-  mvwaddch(map_window->_window, max_y - 1, max_x - 1, '+');
-
-  // from top-left to top-right
-  cur_x = 0;
-  while (cur_x < max_x - 2) {
-    cur_x++;
-    mvwaddch(map_window->_window, 0, cur_x, '-');
+  matrix = calloc(boundaries.x, sizeof(char *));
+  for (uint32_t i = 0; i < boundaries.x; i++) {
+    matrix[i] = calloc(boundaries.y, sizeof(char));
   }
 
-  // from top-left to bottom-left
-  cur_y = 0;
-  wmove(map_window->_window, 0, 0);
-  while (cur_y < max_y - 2) {
-    cur_y++;
-    mvwaddch(map_window->_window, cur_y, 0, '|');
+  // Fill the matrix with dots
+  for (int x = 0; x < boundaries.x; x++) {
+    for (int y = 0; y < boundaries.y; y++) {
+      matrix[x][y] = '.';
+    }
   }
 
-  // from bottom_left to bottom_right
-  cur_x = 0;
-  wmove(map_window->_window, max_y, cur_x);
-  while (cur_x < max_x - 2) {
-    cur_x++;
-    mvwaddch(map_window->_window, max_y - 1, cur_x, '-');
+  // Now take all the entities from the map and draw them in the matrix
+  for (uint32_t i = 0; i < entities_size; i++) {
+    Entity *current_entity = all_entities[i];
+    Point  *point = entity_get_coords(current_entity);
+    matrix[point_get_x(point)][point_get_y(point)] = entity_type_to_char(*entity_get_entity_type(current_entity));
   }
 
-  // from bottom_right to top-right
-  cur_y = 0;
-  wmove(map_window->_window, 0, max_x);
-  while (cur_y < max_y - 2) {
-    cur_y++;
-    mvwaddch(map_window->_window, cur_y, max_x - 1, '|');
+  return matrix;
+}
+
+void map_window_free_matrix(MapWindow *mpw, char **matrix) {
+  MapBoundaries boundaries = map_get_boundaries(mpw->_map);
+  for (int i = 0; i < boundaries.y; i++) {
+    free(matrix[i]);
   }
 
-  // now draw the name of the map (for now it is hardcoded)
-  // TODO: take the name of the map from the map object
-  const char *map_name = "[ Rimini Centro ]";
-  uint32_t    map_name_length = strlen(map_name);
-  mvwprintw(map_window->_window, 0, max_x - map_name_length - 3, "%s", map_name);
-  wrefresh(map_window->_window);
+  free(matrix);
 }
 
 void map_window_draw(MapWindow *map_window) {
-  touchwin(map_window->_window);
-  map_window_draw_borders(map_window);
-  map_wdraw(map_window->_map, map_window->_inner_window);
+  MapBoundaries boundaries = map_get_boundaries(map_window->_map);
+  boxed_window_draw(map_window->_window);
+
+  WINDOW *target = boxed_window_get_inner_window(map_window->_window);
+  char  **matrix = map_window_generate_matrix(map_window);
+
+  wclear(target);
+
+  for (int y = 0; y < boundaries.y; y++) {
+    for (int x = 0; x < boundaries.x; x++) {
+      if (matrix[x][y] == '@') {
+        wattron(target, COLOR_PAIR(1));
+      } else if (matrix[x][y] == '^') {
+        wattron(target, COLOR_PAIR(2));
+      } else if (matrix[x][y] == '&') {
+        wattron(target, COLOR_PAIR(3));
+      } else if (matrix[x][y] == '%') {
+        wattron(target, COLOR_PAIR(4));
+      } else if (matrix[x][y] == '#') {
+        wattron(target, COLOR_PAIR(5));
+      }
+      mvwprintw(target, y, x, "%c", matrix[x][y]);
+      wattroff(target, COLOR_PAIR(1));
+    }
+  }
+
+  wrefresh(target);
+
+  map_window_free_matrix(map_window, matrix);
 }
 
 inline UiPoint *map_window_get_ui_point(MapWindow *map_window) {
@@ -123,17 +122,16 @@ inline UiPoint *map_window_get_ui_point(MapWindow *map_window) {
 }
 
 inline int map_window_get_lines(MapWindow *map_window) {
-  return map_window->_lines;
+  return boxed_window_get_lines(map_window->_window);
 }
 
 inline int map_window_get_cols(MapWindow *map_window) {
-  return map_window->_cols;
+  return boxed_window_get_cols(map_window->_window);
 }
 
 void map_window_free(MapWindow *map_window) {
-  delwin(map_window->_window);
-  delwin(map_window->_inner_window);
   ui_point_free(map_window->_ui_point);
+  boxed_window_free(map_window->_window);
   free(map_window);
 }
 

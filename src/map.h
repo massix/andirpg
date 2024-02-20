@@ -5,7 +5,6 @@
 #include "item.h"
 #include <ncurses.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <sys/types.h>
 
 typedef struct Map Map;
@@ -37,10 +36,5 @@ bool          map_is_tile_free(Map *, uint32_t x, uint32_t y);
 
 // Destructor
 void map_free(Map *);
-
-// FIXME: the logic of drawing the map should not be here
-void map_fdraw(Map *, FILE *);
-void map_draw(Map *);
-void map_wdraw(Map *, WINDOW *);
 
 #endif
