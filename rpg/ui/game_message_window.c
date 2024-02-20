@@ -80,7 +80,7 @@ void game_message_window_draw(GameMessageWindow *gmw) {
 
   gmw->_actual_redraws++;
 
-  wrefresh(target);
+  wnoutrefresh(target);
 }
 
 inline int game_message_window_get_cols(GameMessageWindow *gmw) {

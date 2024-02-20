@@ -1,10 +1,12 @@
 #include "configuration.h"
+#include "debug_window.h"
 #include "engine.h"
 #include "game_message_window.h"
 #include "inventory_window.h"
 #include "logger.h"
 #include "ui/map_window.h"
 #include "ui/player_window.h"
+#include "ui_point.h"
 #include <ncurses.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,8 +43,8 @@ int main(int argc, char *argv[]) {
     PANIC(error_message);
   }
 
-  InventoryWindow *inventory_window = inventory_window_new(engine_get_active_entity(engine), 30, 40, map_window_get_cols(map_window) - 1,
-                                                           player_window_get_lines(player_window) - 1);
+  InventoryWindow *inventory_window = inventory_window_new(engine_get_active_entity(engine), 10, player_window_get_cols(player_window),
+                                                           map_window_get_cols(map_window) - 1, player_window_get_lines(player_window) - 1);
   if (inventory_window == nullptr) {
     PANIC(error_message);
   }
@@ -52,19 +54,49 @@ int main(int argc, char *argv[]) {
     PANIC(error_message);
   }
 
+  UiPoint *ivw_ui_point = inventory_window_get_ui_point(inventory_window);
+
+  int dbg_lines = 1 + LINES - (ui_point_get_y(ivw_ui_point) + inventory_window_get_lines(inventory_window));
+
+  DebugWindow *debug_window = debug_window_new(engine, dbg_lines, inventory_window_get_cols(inventory_window),
+                                               inventory_window_get_lines(inventory_window) + player_window_get_lines(player_window) - 2,
+                                               map_window_get_cols(map_window) - 1);
+  if (debug_window == nullptr) {
+    PANIC(error_message);
+  }
+
+  debug_window_hide(debug_window);
+
   map_window_draw(map_window);
   player_window_draw(player_window);
   inventory_window_draw(inventory_window);
   game_message_window_draw(message_window);
+  debug_window_draw(debug_window);
+
+  doupdate();
 
   char key;
 
   while ((key = getch()) != 'q') {
-    engine_handle_keypress(engine, key);
-    engine_move_all_entities(engine);
-
-    if (key == 's') {
-      game_message_window_show_message(message_window, "Hey, that's an S!");
+    switch (key) {
+      case 's':
+        game_message_window_show_message(message_window, "Hey, that's an S!");
+        break;
+      case 'd':
+        {
+          if (debug_window_is_visible(debug_window)) {
+            debug_window_hide(debug_window);
+            game_message_window_show_message(message_window, "Hiding debug");
+          } else {
+            debug_window_show(debug_window);
+            game_message_window_show_message(message_window, "Showing debug");
+          }
+        }
+        break;
+      default:
+        engine_handle_keypress(engine, key);
+        engine_move_all_entities(engine);
+        break;
     }
 
     // Always draw AT THE END of all the operations
@@ -72,6 +104,9 @@ int main(int argc, char *argv[]) {
     player_window_draw(player_window);
     inventory_window_draw(inventory_window);
     game_message_window_draw(message_window);
+    debug_window_draw(debug_window);
+
+    doupdate();
   }
 
   clear();

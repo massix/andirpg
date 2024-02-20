@@ -112,7 +112,7 @@ void map_window_draw(MapWindow *map_window) {
     }
   }
 
-  wrefresh(target);
+  wnoutrefresh(target);
 
   map_window_free_matrix(map_window, matrix);
 }

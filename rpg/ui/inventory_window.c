@@ -23,12 +23,14 @@
 #include "boxed_window.h"
 #include "entity.h"
 #include "logger.h"
+#include "ui_point.h"
 #include <ncurses.h>
 #include <stdlib.h>
 
 struct InventoryWindow {
   Entity      *_entity;
   BoxedWindow *_window;
+  UiPoint     *_point;
 };
 
 InventoryWindow *inventory_window_new(Entity *entity, int lines, int cols, int x, int y) {
@@ -36,6 +38,7 @@ InventoryWindow *inventory_window_new(Entity *entity, int lines, int cols, int x
   LOG_DEBUG("Creating inventory window %dx%d", cols, lines);
 
   ret->_entity = entity;
+  ret->_point = ui_point_new(x, y);
   struct BoxedWindowOptions options;
   boxed_window_options_default(&options);
 
@@ -49,7 +52,19 @@ void inventory_window_draw_inner(InventoryWindow *ivw) {
 
   wclear(target);
   mvwprintw(target, 0, 0, "No items");
-  wrefresh(target);
+  wnoutrefresh(target);
+}
+
+inline UiPoint *inventory_window_get_ui_point(InventoryWindow *ivw) {
+  return ivw->_point;
+}
+
+inline int inventory_window_get_cols(InventoryWindow *ivw) {
+  return boxed_window_get_cols(ivw->_window);
+}
+
+inline int inventory_window_get_lines(InventoryWindow *ivw) {
+  return boxed_window_get_lines(ivw->_window);
 }
 
 void inventory_window_draw(InventoryWindow *ivw) {
@@ -59,5 +74,6 @@ void inventory_window_draw(InventoryWindow *ivw) {
 
 void inventory_window_free(InventoryWindow *ivw) {
   boxed_window_free(ivw->_window);
+  ui_point_free(ivw->_point);
   free(ivw);
 }

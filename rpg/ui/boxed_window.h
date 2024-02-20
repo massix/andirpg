@@ -31,7 +31,10 @@ int boxed_window_get_lines(BoxedWindow *);
 
 void boxed_window_options_default(struct BoxedWindowOptions *);
 
+void boxed_window_move(BoxedWindow *, int y, int x);
+void boxed_window_restore(BoxedWindow *);
 void boxed_window_draw(BoxedWindow *);
+void boxed_window_clear(BoxedWindow *);
 void boxed_window_set_draw_function(BoxedWindow *, void (*draw_function)(void *, WINDOW *), void *);
 
 void boxed_window_free(BoxedWindow *);

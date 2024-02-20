@@ -178,6 +178,12 @@ void engine_handle_keypress(Engine *engine, char key) {
     default:
       break;
   }
+
+  engine->_current_cycle++;
+}
+
+inline uint32_t engine_get_current_cycle(Engine *eng) {
+  return eng->_current_cycle;
 }
 
 Entity **engine_get_close_entities(Engine *engine, ssize_t *size) {

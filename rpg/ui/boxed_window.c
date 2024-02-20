@@ -100,6 +100,23 @@ inline int boxed_window_get_lines(BoxedWindow *bxw) {
   return bxw->_lines;
 }
 
+void boxed_window_move(BoxedWindow *bxw, int y, int x) {
+  mvwin(bxw->_main_window, y, x);
+  mvwin(bxw->_inner_window, y + bxw->_options->padding, x + bxw->_options->padding);
+}
+
+void boxed_window_restore(BoxedWindow *bxw) {
+  mvwin(bxw->_main_window, bxw->_y, bxw->_x);
+  mvwin(bxw->_inner_window, bxw->_y + bxw->_options->padding, bxw->_x + bxw->_options->padding);
+}
+
+void boxed_window_clear(BoxedWindow *bxw) {
+  wclear(bxw->_main_window);
+  wclear(bxw->_inner_window);
+  wnoutrefresh(bxw->_main_window);
+  wnoutrefresh(bxw->_inner_window);
+}
+
 void boxed_window_draw(BoxedWindow *bxw) {
   LOG_DEBUG("Drawing boxed window", 0);
   int max_x;
@@ -135,7 +152,7 @@ void boxed_window_draw(BoxedWindow *bxw) {
 
   mvwprintw(bxw->_main_window, 0, max_x - title_length - 3, "%s", title);
 
-  wrefresh(bxw->_main_window);
+  wnoutrefresh(bxw->_main_window);
 
   // Draw the inner window (if any)
   if (bxw->_inner_draw != nullptr) {
@@ -143,7 +160,7 @@ void boxed_window_draw(BoxedWindow *bxw) {
 
     wclear(bxw->_inner_window);
     bxw->_inner_draw(bxw->_draw_param, bxw->_inner_window);
-    wrefresh(bxw->_inner_window);
+    wnoutrefresh(bxw->_inner_window);
   }
 }
 

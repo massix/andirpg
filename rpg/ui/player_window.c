@@ -41,7 +41,7 @@ void player_window_draw_inner(PlayerWindow *plw) {
   mvwprintw(target, 1, 0, "XP: 0/1000");
   mvwprintw(target, 2, 0, "LV: 0");
   mvwprintw(target, 3, 0, "Perks: No active perks");
-  wrefresh(target);
+  wnoutrefresh(target);
 }
 
 void player_window_draw(PlayerWindow *plw) {
