@@ -1,6 +1,7 @@
 #include "configuration.h"
 #include "engine.h"
 #include "entity.h"
+#include "inventory_window.h"
 #include "logger.h"
 #include "ui/map_window.h"
 #include "ui/player_window.h"
@@ -16,16 +17,6 @@ Configuration *init_configuration();
 #define PANIC(s)            \
   fprintf(stderr, "%s", s); \
   return -1;
-
-void print_player_info(Engine *engine, WINDOW *window) {
-  if (engine_has_active_entity(engine)) {
-    wmove(window, 0, 0);
-    wprintw(window, "  HP: %d", entity_get_life_points(engine_get_active_entity(engine)));
-    wmove(window, 1, 0);
-    wprintw(window, "NAME: %s", entity_get_name(engine_get_active_entity(engine)));
-    wrefresh(window);
-  }
-}
 
 int main(int argc, char *argv[]) {
   const char *error_message = "Critical error occured, check logs.\n";
@@ -48,8 +39,15 @@ int main(int argc, char *argv[]) {
     PANIC(error_message);
   }
 
+  InventoryWindow *inventory_window = inventory_window_new(engine_get_active_entity(engine), 30, 40, map_window_get_cols(map_window) - 1,
+                                                           player_window_get_lines(player_window) - 1);
+  if (inventory_window == nullptr) {
+    PANIC(error_message);
+  }
+
   map_window_draw(map_window);
   player_window_draw(player_window);
+  inventory_window_draw(inventory_window);
 
   char key;
 
@@ -60,6 +58,7 @@ int main(int argc, char *argv[]) {
     // Always draw AT THE END of all the operations
     map_window_draw(map_window);
     player_window_draw(player_window);
+    inventory_window_draw(inventory_window);
   }
 
   clear();
