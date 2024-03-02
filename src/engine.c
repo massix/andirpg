@@ -2,9 +2,13 @@
 #include "entity.h"
 #include "logger.h"
 #include "map.h"
+#include <msgpack.h>
+#include <msgpack/pack.h>
+#include <msgpack/sbuffer.h>
 #include <point.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 
 struct Engine {
@@ -184,6 +188,42 @@ void engine_handle_keypress(Engine *engine, char key) {
 
 inline uint32_t engine_get_current_cycle(Engine *eng) {
   return eng->_current_cycle;
+}
+
+char *engine_serialize(Engine *eng, size_t *size) {
+  LOG_DEBUG("Starting packer for engine 0x%p", eng);
+  const char *active_entity_header = "active_entity";
+  const char *current_cycle_header = "current_cycle";
+
+  msgpack_sbuffer buffer;
+  msgpack_packer  packer;
+
+  msgpack_sbuffer_init(&buffer);
+  msgpack_packer_init(&packer, &buffer, &msgpack_sbuffer_write);
+
+  // Root object is a map
+  msgpack_pack_map(&packer, 2);
+  msgpack_pack_str_with_body(&packer, active_entity_header, strlen(active_entity_header));
+
+  if (engine_has_active_entity(eng)) {
+    LOG_DEBUG("Engine has active entity", 0);
+    const char *active_entity_name = entity_get_name(engine_get_active_entity(eng));
+    msgpack_pack_str_with_body(&packer, active_entity_name, strlen(active_entity_name));
+  } else {
+    LOG_WARNING("No active entity found!", 0);
+    msgpack_pack_nil(&packer);
+  }
+
+  msgpack_pack_str_with_body(&packer, current_cycle_header, strlen(current_cycle_header));
+  msgpack_pack_unsigned_int(&packer, eng->_current_cycle);
+
+  *size = buffer.size;
+
+  char *ret = (char *)malloc(buffer.size);
+  memcpy(ret, buffer.data, buffer.size);
+
+  msgpack_sbuffer_destroy(&buffer);
+  return ret;
 }
 
 Entity **engine_get_close_entities(Engine *engine, ssize_t *size) {

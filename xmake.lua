@@ -5,7 +5,7 @@ set_config("cc", "clang")
 set_config("ccache", false)
 
 add_requires("cunit")
-add_requires("inih", "ncurses")
+add_requires("inih", "ncurses", "msgpack-c")
 add_cflags("-std=gnu2x", "-m64", "-xc")
 
 set_defaultplat("linux")
@@ -23,7 +23,7 @@ elseif is_mode("release") then
 	add_cflags("-fomit-frame-pointer")
 end
 
-add_packages("inih", "ncurses")
+add_packages("inih", "ncurses", "msgpack-c")
 set_warnings("all", "error")
 set_fpmodels("fast", "except")
 

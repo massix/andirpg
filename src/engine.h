@@ -20,6 +20,7 @@ void     engine_handle_keypress(Engine *, char);
 bool     engine_has_active_entity(Engine *);
 void     engine_move_all_entities(Engine *);
 uint32_t engine_get_current_cycle(Engine *);
+char    *engine_serialize(Engine *, size_t *);
 
 // Fetch all the entities close to the active one
 Entity **engine_get_close_entities(Engine *, ssize_t *);
