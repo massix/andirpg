@@ -288,6 +288,8 @@ void map_serialization_test() {
   free(buffer);
   msgpack_sbuffer_destroy(&sbuffer);
   msgpack_unpacker_destroy(&unpacker);
+
+  map_free(map);
 }
 
 void map_test_suite() {

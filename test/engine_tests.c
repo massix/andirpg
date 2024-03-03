@@ -358,6 +358,8 @@ void engine_serialize_test(void) {
   msgpack_unpacker_destroy(&unpacker);
   msgpack_unpacked_destroy(&result);
   free(file_content);
+
+  engine_free(engine);
 }
 
 void engine_test_suite() {
