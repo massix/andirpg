@@ -2,6 +2,7 @@
 #define __ENTITY__H__
 
 #include "item.h"
+#include <msgpack/sbuffer.h>
 #include <point.h>
 #include <stdint.h>
 #include <sys/types.h>
@@ -30,6 +31,8 @@ bool        entity_is_alive(Entity *);
 bool        entity_is_dead(Entity *);
 EntityType *entity_get_entity_type(Entity *);
 const char *entity_get_name(Entity *);
+
+void entity_serialize(Entity *, msgpack_sbuffer *);
 
 // Inventory manipulation
 size_t entity_inventory_count(Entity *);

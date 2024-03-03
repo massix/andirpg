@@ -3,6 +3,8 @@
 #include "logger.h"
 #include "point.h"
 #include "utils.h"
+#include <msgpack/pack.h>
+#include <msgpack/sbuffer.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -98,6 +100,66 @@ Entity *entity_from_string(const char *input_string) {
   free(name);
 
   return ret;
+}
+
+typedef struct MapKey {
+  char  *str;
+  size_t len;
+} MapKey;
+
+MapKey *map_key_new(const char *input) {
+  MapKey *map_key = calloc(1, sizeof(MapKey));
+  map_key->str = strdup(input);
+  map_key->len = strlen(map_key->str);
+
+  return map_key;
+}
+
+void map_key_free(MapKey *map_key) {
+  free(map_key->str);
+  free(map_key);
+  map_key = nullptr;
+}
+
+void entity_serialize(Entity *ent, msgpack_sbuffer *buffer) {
+  MapKey *k_current_lp = map_key_new("current_lp");
+  MapKey *k_starting_lp = map_key_new("starting_lp");
+  MapKey *k_type = map_key_new("type");
+  MapKey *k_name = map_key_new("name");
+  MapKey *k_coords = map_key_new("coords");
+  MapKey *k_inventory = map_key_new("inventory");
+
+  msgpack_packer packer;
+  msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
+
+  msgpack_pack_map(&packer, 6);
+
+  msgpack_pack_str_with_body(&packer, k_current_lp->str, k_current_lp->len);
+  msgpack_pack_uint64(&packer, ent->_lp);
+
+  msgpack_pack_str_with_body(&packer, k_starting_lp->str, k_starting_lp->len);
+  msgpack_pack_uint64(&packer, ent->_starting_lp);
+
+  msgpack_pack_str_with_body(&packer, k_type->str, k_type->len);
+  msgpack_pack_uint8(&packer, ent->_type);
+
+  msgpack_pack_str_with_body(&packer, k_name->str, k_name->len);
+  msgpack_pack_str_with_body(&packer, ent->_name, strlen(ent->_name));
+
+  msgpack_pack_str_with_body(&packer, k_coords->str, k_coords->len);
+  msgpack_pack_array(&packer, 2);
+  msgpack_pack_uint32(&packer, point_get_x(ent->_coords));
+  msgpack_pack_uint32(&packer, point_get_y(ent->_coords));
+
+  msgpack_pack_str_with_body(&packer, k_inventory->str, k_inventory->len);
+  msgpack_pack_array(&packer, 0);
+
+  map_key_free(k_current_lp);
+  map_key_free(k_starting_lp);
+  map_key_free(k_type);
+  map_key_free(k_name);
+  map_key_free(k_coords);
+  map_key_free(k_inventory);
 }
 
 char entity_type_to_char(EntityType entity_type) {

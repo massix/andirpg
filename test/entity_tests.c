@@ -4,10 +4,21 @@
 #include <CUnit/CUError.h>
 #include <CUnit/CUnit.h>
 #include <CUnit/TestDB.h>
+#include <asm-generic/fcntl.h>
 #include <entity.h>
+#include <msgpack/object.h>
+#include <msgpack/sbuffer.h>
+#include <msgpack/unpack.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <unistd.h>
+
+#define CU_ASSERT_MAP_KEY(k, header)                \
+  CU_ASSERT_EQUAL((k).key.type, MSGPACK_OBJECT_STR) \
+  CU_ASSERT_EQUAL(strncmp((k).key.via.str.ptr, header, (k).key.via.str.size), 0)
 
 void entity_creation_test(void) {
   Entity *human = entity_new(30, HUMAN, "Avatar", 20, 30);
@@ -197,13 +208,87 @@ void entity_inventory_test(void) {
   entity_free(entity);
 }
 
+void entity_serialization_test() {
+  const char *filename = "./entity_serialization.bin";
+
+  Entity *entity = entity_new(30, HUMAN, "Some random name", 42, 23);
+
+  // Simulate something in the engine
+  entity_hurt(entity, 12);
+  entity_move(entity, 3, -4);
+
+  msgpack_sbuffer buffer;
+  msgpack_sbuffer_init(&buffer);
+
+  entity_serialize(entity, &buffer);
+  CU_ASSERT_PTR_NOT_NULL(buffer.data);
+  CU_ASSERT_TRUE(buffer.size > 0);
+
+  // Write to file
+  int file_fd = open(filename, O_CREAT | O_TRUNC | O_WRONLY, 0644);
+  write(file_fd, buffer.data, buffer.size);
+  close(file_fd);
+
+  // Load content of file into a newly created buffer;
+  char  *bin_buffer;
+  FILE  *bin_file = fopen(filename, "rb");
+  size_t bin_length = file_size(bin_file);
+  bin_buffer = malloc(bin_length);
+
+  fread(bin_buffer, bin_length, sizeof(char), bin_file);
+  fclose(bin_file);
+
+  unlink(filename);
+
+  CU_ASSERT_TRUE(strings_equal(buffer.data, bin_buffer));
+
+  // Start the deserialization process
+  msgpack_unpacker unpacker;
+  msgpack_unpacker_init(&unpacker, 0);
+  msgpack_unpacker_reserve_buffer(&unpacker, bin_length);
+  memcpy(msgpack_unpacker_buffer(&unpacker), bin_buffer, bin_length);
+  msgpack_unpacker_buffer_consumed(&unpacker, bin_length);
+
+  msgpack_unpacked result;
+  msgpack_unpacked_init(&result);
+
+  CU_ASSERT_EQUAL(msgpack_unpacker_next(&unpacker, &result), MSGPACK_UNPACK_SUCCESS);
+
+  CU_ASSERT_EQUAL(result.data.type, MSGPACK_OBJECT_MAP);
+  CU_ASSERT_EQUAL(result.data.via.map.size, 6);
+
+  CU_ASSERT_MAP_KEY(result.data.via.map.ptr[0], "current_lp");
+  CU_ASSERT_EQUAL(result.data.via.map.ptr[0].val.via.u64, 30 - 12);
+
+  CU_ASSERT_MAP_KEY(result.data.via.map.ptr[1], "starting_lp");
+  CU_ASSERT_EQUAL(result.data.via.map.ptr[1].val.via.u64, 30);
+
+  CU_ASSERT_MAP_KEY(result.data.via.map.ptr[2], "type");
+  CU_ASSERT_EQUAL(result.data.via.map.ptr[2].val.via.u64, HUMAN);
+
+  CU_ASSERT_MAP_KEY(result.data.via.map.ptr[3], "name");
+  CU_ASSERT_EQUAL(strncmp(result.data.via.map.ptr[3].val.via.str.ptr, "Some random name", result.data.via.map.ptr[3].val.via.str.size), 0);
+
+  CU_ASSERT_MAP_KEY(result.data.via.map.ptr[4], "coords");
+  CU_ASSERT_EQUAL(result.data.via.map.ptr[4].val.via.array.ptr[0].via.u64, 45);
+  CU_ASSERT_EQUAL(result.data.via.map.ptr[4].val.via.array.ptr[1].via.u64, 19);
+
+  CU_ASSERT_MAP_KEY(result.data.via.map.ptr[5], "inventory");
+  CU_ASSERT_EQUAL(result.data.via.map.ptr[5].val.via.array.size, 0);
+
+  msgpack_unpacker_destroy(&unpacker);
+  msgpack_unpacked_destroy(&result);
+  entity_free(entity);
+}
+
 void entity_test_suite() {
   CU_pSuite suite = CU_add_suite("Entity Tests", nullptr, nullptr);
   CU_add_test(suite, "Create a basic entity", &entity_creation_test);
   CU_add_test(suite, "Manipulate life points", &entity_lifepoints_test);
   CU_add_test(suite, "Move entities", &entity_move_test);
   CU_add_test(suite, "Resurrect entities", &entity_resurrect_test);
-  CU_add_test(suite, "Serialization", &entity_to_string_test);
+  CU_add_test(suite, "To/From string", &entity_to_string_test);
+  CU_add_test(suite, "Serialization", &entity_serialization_test);
   CU_add_test(suite, "Inventory manipulation", &entity_inventory_test);
 }
 
