@@ -281,7 +281,7 @@ void engine_serialize_test(void) {
   CU_ASSERT_EQUAL(file_length, buffer.size);
 
   char *file_content = calloc(file_length, sizeof(char));
-  fread(file_content, file_length, sizeof(char), input);
+  fread(file_content, sizeof(char), file_length, input);
   fclose(input);
 
   // We can safely remove the file now
