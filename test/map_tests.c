@@ -4,7 +4,11 @@
 #include "utils.h"
 #include <CUnit/CUnit.h>
 #include <CUnit/TestDB.h>
+#include <asm-generic/fcntl.h>
 #include <entity.h>
+#include <msgpack/object.h>
+#include <msgpack/sbuffer.h>
+#include <msgpack/unpack.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -198,11 +202,100 @@ void map_items_test(void) {
   map_free(map);
 }
 
+void check_msgpack_key(msgpack_object *obj, const char *key) {
+  size_t str_size = obj->via.str.size;
+  char  *str = (char *)malloc(str_size);
+  memcpy(str, obj->via.str.ptr, str_size);
+  CU_ASSERT_TRUE(strings_equal(str, key));
+  free(str);
+}
+
+void map_serialization_test() {
+  const char *filename = "map_serialization_test.bin";
+
+  Map *map = map_new(42, 23, 15);
+  map_add_entity(map, entity_new(30, HUMAN, "E1", 12, 0));
+  map_add_entity(map, entity_new(15, INHUMAN, "E2", 13, 1));
+
+  msgpack_sbuffer sbuffer;
+  msgpack_sbuffer_init(&sbuffer);
+
+  map_serialize(map, &sbuffer);
+  CU_ASSERT_PTR_NOT_NULL(sbuffer.data);
+  CU_ASSERT_TRUE(sbuffer.size > 0);
+
+  // Write to file
+  int msgpack_file = open(filename, O_CREAT | O_TRUNC | O_WRONLY, 0644);
+  write(msgpack_file, sbuffer.data, sbuffer.size);
+  close(msgpack_file);
+
+  // Read file to a new buffer
+  FILE  *input_file = fopen(filename, "rb");
+  size_t input_file_length = file_size(input_file);
+
+  char *buffer = (char *)malloc(input_file_length);
+  fread(buffer, sizeof(char), input_file_length, input_file);
+  fclose(input_file);
+
+  unlink(filename);
+
+  // This assertion *does not guarantee* that the buffers are really the same,
+  // but it's a good guard against other issues
+  CU_ASSERT_TRUE(strings_equal(sbuffer.data, buffer));
+
+  msgpack_unpacker unpacker;
+  msgpack_unpacker_init(&unpacker, 0);
+  msgpack_unpacker_reserve_buffer(&unpacker, input_file_length);
+  memcpy(msgpack_unpacker_buffer(&unpacker), buffer, input_file_length);
+  msgpack_unpacker_buffer_consumed(&unpacker, input_file_length);
+
+  // We should have a single object, which is a map
+  msgpack_unpacked result;
+  msgpack_unpacked_init(&result);
+
+  CU_ASSERT_EQUAL(msgpack_unpacker_next(&unpacker, &result), MSGPACK_UNPACK_SUCCESS);
+  CU_ASSERT_EQUAL(result.data.type, MSGPACK_OBJECT_MAP);
+  CU_ASSERT_EQUAL(result.data.via.map.size, 6);
+
+  msgpack_object_kv *map_objects = result.data.via.map.ptr;
+
+  // First object should be "x_size" => 42
+  check_msgpack_key(&map_objects[0].key, "x_size");
+  CU_ASSERT_EQUAL(map_objects[0].val.via.u64, 42);
+
+  // Second object should be "y_size" => 23
+  check_msgpack_key(&map_objects[1].key, "y_size");
+  CU_ASSERT_EQUAL(map_objects[1].val.via.u64, 23);
+
+  // Third object should be "max_entities" => 15
+  check_msgpack_key(&map_objects[2].key, "max_entities");
+  CU_ASSERT_EQUAL(map_objects[2].val.via.u64, 15);
+
+  // Fourth object should be "last_index" => 2
+  check_msgpack_key(&map_objects[3].key, "last_index");
+  CU_ASSERT_EQUAL(map_objects[3].val.via.u64, 2);
+
+  // Fifth index should be "entities", empty array (for now)
+  check_msgpack_key(&map_objects[4].key, "entities");
+  CU_ASSERT_EQUAL(map_objects[4].val.type, MSGPACK_OBJECT_ARRAY);
+  CU_ASSERT_EQUAL(map_objects[4].val.via.array.size, 0);
+
+  // Sixth index should be "items", empty array (for now)
+  check_msgpack_key(&map_objects[5].key, "items");
+  CU_ASSERT_EQUAL(map_objects[5].val.type, MSGPACK_OBJECT_ARRAY);
+  CU_ASSERT_EQUAL(map_objects[5].val.via.array.size, 0);
+
+  free(buffer);
+  msgpack_sbuffer_destroy(&sbuffer);
+  msgpack_unpacker_destroy(&unpacker);
+}
+
 void map_test_suite() {
   CU_pSuite suite = CU_add_suite("Map Tests", nullptr, nullptr);
   CU_add_test(suite, "Creation", &map_creation_test);
   CU_add_test(suite, "Handle Entities", &map_entities_test);
   CU_add_test(suite, "Handle Items", &map_items_test);
   CU_add_test(suite, "Serialization", &map_dump_test);
+  CU_add_test(suite, "Msgpack Serialization", &map_serialization_test);
 }
 

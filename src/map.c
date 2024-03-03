@@ -1,13 +1,16 @@
 #include "map.h"
 #include "entity.h"
 #include "item.h"
-#include "logger.h"
 #include "point.h"
 #include "utils.h"
+#include <msgpack/pack.h>
+#include <msgpack/sbuffer.h>
+#include <msgpack/unpack.h>
 #include <ncurses.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 
 struct Map {
@@ -252,6 +255,47 @@ MapBoundaries map_get_boundaries(Map *map) {
   boundaries.y = map->_y_size;
 
   return boundaries;
+}
+
+// uint32_t _x_size;
+// uint32_t _y_size;
+// uint32_t _last_index;
+// uint32_t _entities_size;
+// uint32_t _items_size;
+// Entity **_entities;
+// Item   **_items;
+
+void map_serialize(Map *map, msgpack_sbuffer *buffer) {
+  const char *x_size_key = "x_size";
+  const char *y_size_key = "y_size";
+  const char *max_entities_key = "max_entities";
+  const char *last_index_key = "last_index";
+  const char *entities_key = "entities";
+  const char *items_key = "items";
+
+  msgpack_packer packer;
+  msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
+
+  // Map is a dictionary
+  msgpack_pack_map(&packer, 6);
+
+  msgpack_pack_str_with_body(&packer, x_size_key, strlen(x_size_key));
+  msgpack_pack_uint32(&packer, map->_x_size);
+
+  msgpack_pack_str_with_body(&packer, y_size_key, strlen(y_size_key));
+  msgpack_pack_uint32(&packer, map->_y_size);
+
+  msgpack_pack_str_with_body(&packer, max_entities_key, strlen(max_entities_key));
+  msgpack_pack_uint32(&packer, map->_entities_size);
+
+  msgpack_pack_str_with_body(&packer, last_index_key, strlen(last_index_key));
+  msgpack_pack_uint32(&packer, map->_last_index);
+
+  msgpack_pack_str_with_body(&packer, entities_key, strlen(entities_key));
+  msgpack_pack_array(&packer, 0);
+
+  msgpack_pack_str_with_body(&packer, items_key, strlen(items_key));
+  msgpack_pack_array(&packer, 0);
 }
 
 void map_free(Map *map) {

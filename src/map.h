@@ -3,6 +3,7 @@
 
 #include "entity.h"
 #include "item.h"
+#include <msgpack/sbuffer.h>
 #include <ncurses.h>
 #include <stdint.h>
 #include <sys/types.h>
@@ -33,6 +34,7 @@ bool          map_contains_entity(Map *, const char *);
 int           map_count_entities(Map *);
 MapBoundaries map_get_boundaries(Map *);
 bool          map_is_tile_free(Map *, uint32_t x, uint32_t y);
+void          map_serialize(Map *, msgpack_sbuffer *);
 
 // Destructor
 void map_free(Map *);
