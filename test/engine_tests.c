@@ -7,6 +7,7 @@
 #include <CUnit/TestDB.h>
 #include <asm-generic/fcntl.h>
 #include <msgpack/object.h>
+#include <msgpack/sbuffer.h>
 #include <msgpack/unpack.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -252,6 +253,9 @@ void engine_attack_test(void) {
 void engine_serialize_test(void) {
   const char *filename = "engine_serialize_test.bin";
 
+  msgpack_sbuffer buffer;
+  msgpack_sbuffer_init(&buffer);
+
   Engine *engine = engine_new(map_new(20, 20, 10));
   map_add_entity(engine_get_map(engine), entity_new(30, HUMAN, "Active player", 0, 0));
   engine_set_active_entity(engine, "Active player");
@@ -261,21 +265,20 @@ void engine_serialize_test(void) {
     engine_handle_keypress(engine, 'k');
   }
 
-  size_t buffer_size = -1;
-  char  *buffer = engine_serialize(engine, &buffer_size);
-  CU_ASSERT_PTR_NOT_NULL(buffer);
-  CU_ASSERT_FALSE(buffer_size == -1);
+  engine_serialize(engine, &buffer);
+  CU_ASSERT_PTR_NOT_NULL(buffer.data);
+  CU_ASSERT_FALSE(buffer.size == -1);
 
   // Store the buffer to a file
   int fd_output = open(filename, O_RDWR | O_CREAT | O_TRUNC, 0644);
-  write(fd_output, buffer, buffer_size);
+  write(fd_output, buffer.data, buffer.size);
   close(fd_output);
 
   // Now load the same buffer from the file and attempt to decode it
   FILE   *input = fopen(filename, "rb");
   int64_t file_length = file_size(input);
   CU_ASSERT_NOT_EQUAL(file_length, -1);
-  CU_ASSERT_EQUAL(file_length, buffer_size);
+  CU_ASSERT_EQUAL(file_length, buffer.size);
 
   char *file_content = calloc(file_length, sizeof(char));
   fread(file_content, file_length, sizeof(char), input);
@@ -285,10 +288,10 @@ void engine_serialize_test(void) {
   unlink(filename);
 
   CU_ASSERT_PTR_NOT_NULL(file_content);
-  CU_ASSERT_TRUE(strings_equal(buffer, file_content));
+  CU_ASSERT_TRUE(strings_equal(buffer.data, file_content));
 
-  // // Release the ~kraken~ buffer!
-  free(buffer);
+  // Release the ~kraken~ buffer!
+  msgpack_sbuffer_destroy(&buffer);
 
   msgpack_unpacker unpacker;
 
