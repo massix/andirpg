@@ -3,6 +3,15 @@
 #include "utils.h"
 #include <CUnit/CUnit.h>
 #include <CUnit/TestDB.h>
+#include <asm-generic/fcntl.h>
+#include <msgpack/object.h>
+#include <msgpack/sbuffer.h>
+#include <msgpack/unpack.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 void item_new_test(void) {
   const char *item_name = "A broadsword";
@@ -92,11 +101,214 @@ void item_coordinates_test(void) {
   item_free(without_coords);
 }
 
+void store_to_disk(const char *filename, msgpack_sbuffer *buffer) {
+  int file_fd = open(filename, O_CREAT | O_TRUNC | O_WRONLY, 0644);
+  write(file_fd, buffer->data, buffer->size);
+  close(file_fd);
+}
+
+typedef struct ItemTypeTest {
+  msgpack_sbuffer  *buffer;
+  char             *filename;
+  Item             *item;
+  char             *loaded_buffer;
+  size_t            loaded_buffer_size;
+  bool              stored;
+  msgpack_unpacked *unpacked;
+} ItemTypeTest;
+
+ItemTypeTest *item_type_test_new(const char *filename, Item *item) {
+  ItemTypeTest *ret = calloc(1, sizeof(ItemTypeTest));
+  ret->buffer = msgpack_sbuffer_new();
+  ret->filename = strdup(filename);
+  ret->item = item;
+  ret->stored = false;
+  ret->loaded_buffer = nullptr;
+  ret->loaded_buffer_size = -1;
+  ret->unpacked = nullptr;
+
+  return ret;
+}
+
+void item_type_test_free(ItemTypeTest *itt) {
+  free(itt->filename);
+  msgpack_sbuffer_free(itt->buffer);
+  item_free(itt->item);
+
+  if (itt->stored) {
+    unlink(itt->filename);
+  }
+
+  if (itt->loaded_buffer != nullptr) {
+    free(itt->loaded_buffer);
+  }
+
+  if (itt->unpacked != nullptr) {
+    msgpack_unpacked_destroy(itt->unpacked);
+    free(itt->unpacked);
+  }
+
+  free(itt);
+}
+
+void item_type_test_serialize(ItemTypeTest *itt) {
+  msgpack_sbuffer_init(itt->buffer);
+  item_serialize(itt->item, itt->buffer);
+}
+
+void item_type_test_store(ItemTypeTest *itt) {
+  store_to_disk(itt->filename, itt->buffer);
+  itt->stored = true;
+}
+
+// Reload the serialization result from disk
+void item_type_test_reload(ItemTypeTest *itt) {
+  if (!itt->stored) {
+    return;
+  }
+
+  FILE *input = fopen(itt->filename, "rb");
+  itt->loaded_buffer_size = file_size(input);
+  itt->loaded_buffer = (char *)malloc(itt->loaded_buffer_size);
+  fread(itt->loaded_buffer, sizeof(char), itt->loaded_buffer_size, input);
+  fclose(input);
+}
+
+void item_type_test_unpack(ItemTypeTest *self) {
+  self->unpacked = calloc(1, sizeof(msgpack_unpacked));
+  msgpack_unpacker unpacker;
+  msgpack_unpacker_init(&unpacker, 0);
+  msgpack_unpacker_reserve_buffer(&unpacker, self->loaded_buffer_size);
+  memcpy(msgpack_unpacker_buffer(&unpacker), self->loaded_buffer, self->loaded_buffer_size);
+  msgpack_unpacker_buffer_consumed(&unpacker, self->loaded_buffer_size);
+
+  CU_ASSERT_EQUAL(msgpack_unpacker_next(&unpacker, self->unpacked), MSGPACK_UNPACK_SUCCESS);
+
+  msgpack_unpacker_destroy(&unpacker);
+}
+
+msgpack_object_kv *msgpack_map_get_key(msgpack_object_map *map, const char *key) {
+  msgpack_object_kv *ret = nullptr;
+
+  for (int i = 0; i < map->size; i++) {
+    msgpack_object_str heading = map->ptr[i].key.via.str;
+    if (strncmp(key, heading.ptr, heading.size) == 0) {
+      ret = &map->ptr[i];
+    }
+  }
+
+  return ret;
+}
+
+void item_type_test_complete(ItemTypeTest *self) {
+  item_type_test_serialize(self);
+  CU_ASSERT_PTR_NOT_NULL(self->buffer->data);
+
+  item_type_test_store(self);
+  CU_ASSERT_TRUE(self->stored);
+
+  item_type_test_reload(self);
+  CU_ASSERT_PTR_NOT_NULL(self->loaded_buffer);
+  CU_ASSERT_TRUE(self->loaded_buffer_size > 0);
+
+  item_type_test_unpack(self);
+  CU_ASSERT_PTR_NOT_NULL(self->unpacked);
+  CU_ASSERT_EQUAL(self->unpacked->data.type, MSGPACK_OBJECT_MAP);
+  CU_ASSERT_EQUAL(self->unpacked->data.via.map.size, 6);
+
+  // Check common fields
+  msgpack_object_kv *kv_type = msgpack_map_get_key(&self->unpacked->data.via.map, "type");
+  CU_ASSERT_PTR_NOT_NULL(kv_type);
+  CU_ASSERT_EQUAL(kv_type->val.via.u64, item_get_type(self->item));
+
+  msgpack_object_kv *kv_name = msgpack_map_get_key(&self->unpacked->data.via.map, "name");
+  CU_ASSERT_PTR_NOT_NULL(kv_name);
+  CU_ASSERT_EQUAL(strncmp(kv_name->val.via.str.ptr, item_get_name(self->item), kv_name->val.via.str.size), 0);
+
+  msgpack_object_kv *kv_weight = msgpack_map_get_key(&self->unpacked->data.via.map, "weight");
+  CU_ASSERT_PTR_NOT_NULL(kv_weight);
+  CU_ASSERT_EQUAL(kv_weight->val.via.u64, item_get_weight(self->item));
+
+  msgpack_object_kv *kv_value = msgpack_map_get_key(&self->unpacked->data.via.map, "value");
+  CU_ASSERT_PTR_NOT_NULL(kv_value);
+  CU_ASSERT_EQUAL(kv_value->val.via.u64, item_get_value(self->item));
+
+  // This will be checked by the caller
+  CU_ASSERT_PTR_NOT_NULL(msgpack_map_get_key(&self->unpacked->data.via.map, "properties"));
+
+  msgpack_object_kv *kv_coords = msgpack_map_get_key(&self->unpacked->data.via.map, "coords");
+  CU_ASSERT_PTR_NOT_NULL(kv_coords);
+  if (item_has_coords(self->item)) {
+    CU_ASSERT_EQUAL(kv_coords->val.via.array.size, 2);
+    CU_ASSERT_EQUAL(kv_coords->val.via.array.ptr[0].via.u64, point_get_x(item_get_coords(self->item)));
+    CU_ASSERT_EQUAL(kv_coords->val.via.array.ptr[1].via.u64, point_get_y(item_get_coords(self->item)));
+  } else {
+    CU_ASSERT_EQUAL(kv_coords->val.via.array.size, 0);
+  }
+}
+
+msgpack_object_kv *item_type_test_get_properties(ItemTypeTest *self) {
+  if (self->unpacked != nullptr) {
+    return msgpack_map_get_key(&self->unpacked->data.via.map, "properties");
+  }
+
+  return nullptr;
+}
+
+void item_serialize_test(void) {
+  Item *armor = armor_new("Armor 1", 20, 512, 20, 5, 3);
+  Item *pickaxe = tool_new("Pickaxe", 30, 10, 2, 40);
+  Item *weapon = weapon_new("Excalibur", 20, 50, 2, 30, 10);
+  item_set_coords(weapon, 10, 30);
+
+  ItemTypeTest *armor_test = item_type_test_new("./armor.bin", armor);
+  ItemTypeTest *pickaxe_test = item_type_test_new("./pickaxe.bin", pickaxe);
+  ItemTypeTest *weapon_test = item_type_test_new("./weapon.bin", weapon);
+
+  item_type_test_complete(armor_test);
+  item_type_test_complete(pickaxe_test);
+  item_type_test_complete(weapon_test);
+
+  msgpack_object_kv *armor_properties = item_type_test_get_properties(armor_test);
+  CU_ASSERT_PTR_NOT_NULL(armor_properties);
+  CU_ASSERT_EQUAL(armor_properties->val.type, MSGPACK_OBJECT_MAP)
+  CU_ASSERT_EQUAL(msgpack_map_get_key(&armor_properties->val.via.map, "defense_value")->val.via.u64,
+                  armor_get_defense_value(item_get_properties(armor)));
+  CU_ASSERT_EQUAL(msgpack_map_get_key(&armor_properties->val.via.map, "life_points")->val.via.u64,
+                  armor_get_life_points(item_get_properties(armor)));
+  CU_ASSERT_EQUAL(msgpack_map_get_key(&armor_properties->val.via.map, "armor_class")->val.via.u64,
+                  armor_get_armor_class(item_get_properties(armor)));
+
+  msgpack_object_kv *pickaxe_properties = item_type_test_get_properties(pickaxe_test);
+  CU_ASSERT_PTR_NOT_NULL(pickaxe_properties);
+  CU_ASSERT_EQUAL(pickaxe_properties->val.type, MSGPACK_OBJECT_MAP);
+  CU_ASSERT_EQUAL(msgpack_map_get_key(&pickaxe_properties->val.via.map, "hands")->val.via.u64,
+                  tool_get_hands(item_get_properties(pickaxe)));
+  CU_ASSERT_EQUAL(msgpack_map_get_key(&pickaxe_properties->val.via.map, "life_points")->val.via.u64,
+                  tool_get_life_points(item_get_properties(pickaxe)));
+
+  msgpack_object_kv *weapon_properties = item_type_test_get_properties(weapon_test);
+  CU_ASSERT_PTR_NOT_NULL(weapon_properties);
+  CU_ASSERT_PTR_NOT_NULL(weapon_properties);
+  CU_ASSERT_EQUAL(weapon_properties->val.type, MSGPACK_OBJECT_MAP);
+  CU_ASSERT_EQUAL(msgpack_map_get_key(&weapon_properties->val.via.map, "hands")->val.via.u64,
+                  weapon_get_hands(item_get_properties(weapon)));
+  CU_ASSERT_EQUAL(msgpack_map_get_key(&weapon_properties->val.via.map, "life_points")->val.via.u64,
+                  weapon_get_life_points(item_get_properties(weapon)));
+  CU_ASSERT_EQUAL(msgpack_map_get_key(&weapon_properties->val.via.map, "attack_power")->val.via.u64,
+                  weapon_get_attack_power(item_get_properties(weapon)));
+
+  item_type_test_free(weapon_test);
+  item_type_test_free(pickaxe_test);
+  item_type_test_free(armor_test);
+}
+
 void item_test_suite() {
   CU_pSuite suite = CU_add_suite("Items Tests", nullptr, nullptr);
   CU_add_test(suite, "Item creation", &item_new_test);
   CU_add_test(suite, "Item properties", &item_properties_test);
   CU_add_test(suite, "Item coordinates", &item_coordinates_test);
   CU_add_test(suite, "Item clonation", &item_clone_test);
+  CU_add_test(suite, "Item serialization", &item_serialize_test);
 }
 

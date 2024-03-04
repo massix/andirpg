@@ -2,6 +2,7 @@
 #define __ITEM__H__
 
 #include "point.h"
+#include <msgpack/sbuffer.h>
 #include <stdint.h>
 
 typedef struct Item Item;
@@ -28,6 +29,7 @@ const char *item_get_name(Item *);
 uint32_t    item_get_weight(Item *);
 uint32_t    item_get_value(Item *);
 ItemType    item_get_type(Item *);
+void        item_serialize(Item *, msgpack_sbuffer *);
 
 // By default, an item belongs to an entity, but an Item can also be present
 // on the map, hence we might have coordinates (although they are not mandatory)

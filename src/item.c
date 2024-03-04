@@ -1,6 +1,8 @@
 #include "item.h"
 #include "logger.h"
 #include "point.h"
+#include <msgpack/pack.h>
+#include <msgpack/sbuffer.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,6 +46,125 @@ Item *item_new(ItemType item_type, const char *name, uint32_t weight, uint32_t v
   ret->_coords = nullptr;
 
   return ret;
+}
+
+#define WRITE_MAP_KEY(packer, key) msgpack_pack_str_with_body(&(packer), #key, strlen(#key))
+
+// Forward declarations
+void armor_serialize(Item *, msgpack_packer *);
+void tool_serialize(Item *, msgpack_packer *);
+void forage_serialize(Item *, msgpack_packer *);
+void weapon_serialize(Item *, msgpack_packer *);
+void gem_serialize(Item *, msgpack_packer *);
+
+void item_serialize(Item *item, msgpack_sbuffer *buffer) {
+  LOG_INFO("Packing generic item", 0);
+
+  msgpack_packer packer;
+  msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
+  msgpack_pack_map(&packer, 6);
+
+  WRITE_MAP_KEY(packer, type);
+  msgpack_pack_uint8(&packer, item->_type);
+
+  WRITE_MAP_KEY(packer, name);
+  msgpack_pack_str_with_body(&packer, item->_name, strlen(item->_name));
+
+  WRITE_MAP_KEY(packer, weight);
+  msgpack_pack_uint32(&packer, item->_weight);
+
+  WRITE_MAP_KEY(packer, value);
+  msgpack_pack_uint32(&packer, item->_value);
+
+  WRITE_MAP_KEY(packer, coords);
+  if (item_has_coords(item)) {
+    msgpack_pack_array(&packer, 2);
+    msgpack_pack_uint32(&packer, point_get_x(item->_coords));
+    msgpack_pack_uint32(&packer, point_get_y(item->_coords));
+  } else {
+    msgpack_pack_array(&packer, 0);
+  }
+
+  WRITE_MAP_KEY(packer, properties);
+  switch (item->_type) {
+    case ARMOR:
+      armor_serialize(item, &packer);
+      break;
+    case TOOL:
+      tool_serialize(item, &packer);
+      break;
+    case WEAPON:
+      weapon_serialize(item, &packer);
+      break;
+    case FORAGE:
+      forage_serialize(item, &packer);
+      break;
+    case GEM:
+      gem_serialize(item, &packer);
+      break;
+    default:
+      msgpack_pack_nil(&packer);
+      break;
+  }
+
+  msgpack_pack_nil(&packer);
+}
+
+// Specialized serialization
+void armor_serialize(Item *item, msgpack_packer *packer) {
+  LOG_INFO("Packing armor", 0);
+  ArmorProperties *properties = (ArmorProperties *)item->_properties;
+  msgpack_pack_map(packer, 3);
+
+  WRITE_MAP_KEY(*packer, defense_value);
+  msgpack_pack_uint32(packer, properties->_defense_value);
+
+  WRITE_MAP_KEY(*packer, armor_class);
+  msgpack_pack_uint8(packer, properties->_armor_class);
+
+  WRITE_MAP_KEY(*packer, life_points);
+  msgpack_pack_uint8(packer, properties->_life_points);
+}
+
+// Specialized serialization
+void tool_serialize(Item *item, msgpack_packer *packer) {
+  LOG_INFO("Packing tool", 0);
+  ToolProperties *properties = (ToolProperties *)item->_properties;
+  msgpack_pack_map(packer, 2);
+
+  WRITE_MAP_KEY(*packer, hands);
+  msgpack_pack_uint8(packer, properties->_hands);
+
+  WRITE_MAP_KEY(*packer, life_points);
+  msgpack_pack_uint8(packer, properties->_life_points);
+}
+
+// Specialized serialization
+void weapon_serialize(Item *item, msgpack_packer *packer) {
+  LOG_INFO("Packing weapon", 0);
+  WeaponProperties *properties = (WeaponProperties *)item->_properties;
+  msgpack_pack_map(packer, 3);
+
+  WRITE_MAP_KEY(*packer, attack_power);
+  msgpack_pack_uint32(packer, properties->_attack_power);
+
+  WRITE_MAP_KEY(*packer, life_points);
+  msgpack_pack_uint8(packer, properties->_life_points);
+
+  WRITE_MAP_KEY(*packer, hands);
+  msgpack_pack_uint8(packer, properties->_hands);
+}
+
+// Specialized serialization
+void forage_serialize(Item *item, msgpack_packer *packer) {
+  LOG_WARNING("Forage items not implemented yet, cannot pack it", 0);
+  msgpack_pack_nil(packer);
+}
+
+// Specialized serialization
+void gem_serialize(Item *item, msgpack_packer *packer) {
+  LOG_WARNING("Gem items not implemented yet, cannot pack it", 0);
+  msgpack_pack_nil(packer);
 }
 
 Item *item_clone(Item *origin) {
