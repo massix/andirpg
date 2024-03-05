@@ -257,14 +257,6 @@ MapBoundaries map_get_boundaries(Map *map) {
   return boundaries;
 }
 
-// uint32_t _x_size;
-// uint32_t _y_size;
-// uint32_t _last_index;
-// uint32_t _entities_size;
-// uint32_t _items_size;
-// Entity **_entities;
-// Item   **_items;
-
 void map_serialize(Map *map, msgpack_sbuffer *buffer) {
   const char *x_size_key = "x_size";
   const char *y_size_key = "y_size";
