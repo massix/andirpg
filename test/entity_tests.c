@@ -9,16 +9,17 @@
 #include <msgpack/object.h>
 #include <msgpack/sbuffer.h>
 #include <msgpack/unpack.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-#define CU_ASSERT_MAP_KEY(k, header)                \
-  CU_ASSERT_EQUAL((k).key.type, MSGPACK_OBJECT_STR) \
-  CU_ASSERT_EQUAL(strncmp((k).key.via.str.ptr, header, (k).key.via.str.size), 0)
+#define CU_ASSERT_MAP_KEY(k, header)                                               \
+  {                                                                                \
+    CU_ASSERT_EQUAL((k).key.type, MSGPACK_OBJECT_STR)                              \
+    CU_ASSERT_EQUAL(strncmp((k).key.via.str.ptr, header, (k).key.via.str.size), 0) \
+  }
 
 void entity_creation_test(void) {
   Entity *human = entity_new(30, HUMAN, "Avatar", 20, 30);
@@ -212,6 +213,9 @@ void entity_serialization_test() {
   const char *filename = "./entity_serialization.bin";
 
   Entity *entity = entity_new(30, HUMAN, "Some random name", 42, 23);
+  entity_inventory_add_item(entity, tool_new("Pickaxe", 30, 15, 2, 14));
+  entity_inventory_add_item(entity, armor_new("An armor", 30, 16, 50, 30, 4));
+  entity_inventory_add_item(entity, item_new(FORAGE, "A fruit", 10, 30));
 
   // Simulate something in the engine
   entity_hurt(entity, 12);
@@ -274,7 +278,10 @@ void entity_serialization_test() {
   CU_ASSERT_EQUAL(result.data.via.map.ptr[4].val.via.array.ptr[1].via.u64, 19);
 
   CU_ASSERT_MAP_KEY(result.data.via.map.ptr[5], "inventory");
-  CU_ASSERT_EQUAL(result.data.via.map.ptr[5].val.via.array.size, 0);
+
+  // We're not checking the validity of the items themselves since this is already
+  // tested elsewhere.
+  CU_ASSERT_EQUAL(result.data.via.map.ptr[5].val.via.array.size, 3);
 
   msgpack_unpacker_destroy(&unpacker);
   msgpack_unpacked_destroy(&result);

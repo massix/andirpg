@@ -152,7 +152,10 @@ void entity_serialize(Entity *ent, msgpack_sbuffer *buffer) {
   msgpack_pack_uint32(&packer, point_get_y(ent->_coords));
 
   msgpack_pack_str_with_body(&packer, k_inventory->str, k_inventory->len);
-  msgpack_pack_array(&packer, 0);
+  msgpack_pack_array(&packer, entity_inventory_count(ent));
+  for (uint32_t i = 0; i < entity_inventory_count(ent); i++) {
+    item_serialize(ent->_inventory[i], buffer);
+  }
 
   map_key_free(k_current_lp);
   map_key_free(k_starting_lp);

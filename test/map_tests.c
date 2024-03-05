@@ -217,6 +217,12 @@ void map_serialization_test() {
   map_add_entity(map, entity_new(30, HUMAN, "E1", 12, 0));
   map_add_entity(map, entity_new(15, INHUMAN, "E2", 13, 1));
 
+  // I don't care about the items themselves
+  map_add_item(map, armor_new("An armor", 30, 15, 16, 3, 3), 10, 1);
+  map_add_item(map, armor_new("A tee-shirt", 30, 15, 16, 3, 3), 10, 1);
+  map_add_item(map, armor_new("A blue-jeans", 30, 15, 16, 3, 3), 10, 1);
+  map_add_item(map, armor_new("A hat", 30, 15, 16, 3, 3), 10, 1);
+
   msgpack_sbuffer sbuffer;
   msgpack_sbuffer_init(&sbuffer);
 
@@ -275,15 +281,19 @@ void map_serialization_test() {
   check_msgpack_key(&map_objects[3].key, "last_index");
   CU_ASSERT_EQUAL(map_objects[3].val.via.u64, 2);
 
-  // Fifth index should be "entities", empty array (for now)
+  // Fifth index should be "entities", containing 2 entities
+  // We're not checking the validity of the entities here, since that is already
+  // tested elsewhere.
   check_msgpack_key(&map_objects[4].key, "entities");
   CU_ASSERT_EQUAL(map_objects[4].val.type, MSGPACK_OBJECT_ARRAY);
-  CU_ASSERT_EQUAL(map_objects[4].val.via.array.size, 0);
+  CU_ASSERT_EQUAL(map_objects[4].val.via.array.size, 2);
 
-  // Sixth index should be "items", empty array (for now)
+  // Sixth index should be "items", containing 4 items
+  // We're not checking the validity of the items here, since that is already
+  // tested elsewhere.
   check_msgpack_key(&map_objects[5].key, "items");
   CU_ASSERT_EQUAL(map_objects[5].val.type, MSGPACK_OBJECT_ARRAY);
-  CU_ASSERT_EQUAL(map_objects[5].val.via.array.size, 0);
+  CU_ASSERT_EQUAL(map_objects[5].val.via.array.size, 4);
 
   free(buffer);
   msgpack_sbuffer_destroy(&sbuffer);

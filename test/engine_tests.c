@@ -319,7 +319,7 @@ void engine_serialize_test(void) {
 
   // The first part should be a map of 2 objects
   CU_ASSERT_EQUAL(result.data.type, MSGPACK_OBJECT_MAP);
-  CU_ASSERT_EQUAL(result.data.via.map.size, 2);
+  CU_ASSERT_EQUAL(result.data.via.map.size, 3);
 
   msgpack_object_kv *map_objects = result.data.via.map.ptr;
 
@@ -353,6 +353,18 @@ void engine_serialize_test(void) {
   // The second value should be equal to the current active cycle
   CU_ASSERT_EQUAL(map_objects[1].val.type, MSGPACK_OBJECT_POSITIVE_INTEGER);
   CU_ASSERT_EQUAL(map_objects[1].val.via.u64, engine_get_current_cycle(engine));
+
+  // The third value should be a map serialization object
+  CU_ASSERT_EQUAL(map_objects[2].key.type, MSGPACK_OBJECT_STR);
+  slice_size = map_objects[2].key.via.str.size;
+  slice = malloc(slice_size);
+  memcpy(slice, map_objects[2].key.via.str.ptr, slice_size);
+  CU_ASSERT_TRUE(strings_equal(slice, "map_object"));
+
+  // We are not testing here the content of this map since it is already
+  // tested in the map_serialization_test, we're happy to know that this
+  // is a map!
+  CU_ASSERT_EQUAL(map_objects[2].val.type, MSGPACK_OBJECT_MAP);
 
   // Free all the memory
   msgpack_unpacker_destroy(&unpacker);

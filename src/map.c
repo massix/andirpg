@@ -292,10 +292,16 @@ void map_serialize(Map *map, msgpack_sbuffer *buffer) {
   msgpack_pack_uint32(&packer, map->_last_index);
 
   msgpack_pack_str_with_body(&packer, entities_key, strlen(entities_key));
-  msgpack_pack_array(&packer, 0);
+  msgpack_pack_array(&packer, map_count_entities(map));
+  for (uint32_t i = 0; i < map_count_entities(map); i++) {
+    entity_serialize(map->_entities[i], buffer);
+  }
 
   msgpack_pack_str_with_body(&packer, items_key, strlen(items_key));
-  msgpack_pack_array(&packer, 0);
+  msgpack_pack_array(&packer, map_count_items(map));
+  for (uint32_t i = 0; i < map_count_items(map); i++) {
+    item_serialize(map->_items[i], buffer);
+  }
 }
 
 void map_free(Map *map) {

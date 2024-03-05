@@ -190,18 +190,18 @@ inline uint32_t engine_get_current_cycle(Engine *eng) {
   return eng->_current_cycle;
 }
 
+#define PACK_MAP_KEY(packer, key) msgpack_pack_str_with_body(&(packer), key, strlen(key))
+
 void engine_serialize(Engine *eng, msgpack_sbuffer *buffer) {
   LOG_DEBUG("Starting packer for engine 0x%p", eng);
-  const char *active_entity_header = "active_entity";
-  const char *current_cycle_header = "current_cycle";
 
   msgpack_packer packer;
 
   msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
 
   // Root object is a map
-  msgpack_pack_map(&packer, 2);
-  msgpack_pack_str_with_body(&packer, active_entity_header, strlen(active_entity_header));
+  msgpack_pack_map(&packer, 3);
+  PACK_MAP_KEY(packer, "active_entity");
 
   if (engine_has_active_entity(eng)) {
     LOG_DEBUG("Engine has active entity", 0);
@@ -212,8 +212,11 @@ void engine_serialize(Engine *eng, msgpack_sbuffer *buffer) {
     msgpack_pack_nil(&packer);
   }
 
-  msgpack_pack_str_with_body(&packer, current_cycle_header, strlen(current_cycle_header));
+  PACK_MAP_KEY(packer, "current_cycle");
   msgpack_pack_unsigned_int(&packer, eng->_current_cycle);
+
+  PACK_MAP_KEY(packer, "map_object");
+  map_serialize(eng->_map, buffer);
 }
 
 Entity **engine_get_close_entities(Engine *engine, ssize_t *size) {
