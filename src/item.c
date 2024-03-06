@@ -1,6 +1,8 @@
 #include "item.h"
 #include "logger.h"
 #include "point.h"
+#include <assert.h>
+#include <msgpack/object.h>
 #include <msgpack/pack.h>
 #include <msgpack/sbuffer.h>
 #include <stdint.h>
@@ -108,6 +110,136 @@ void item_serialize(Item *item, msgpack_sbuffer *buffer) {
   }
 
   msgpack_pack_nil(&packer);
+}
+
+bool strnequal(const char *lhs, const char *rhs, size_t size) {
+  return strncmp(lhs, rhs, size) == 0;
+}
+
+msgpack_object_kv *find_key(msgpack_object_map *map, const char *key) {
+  msgpack_object_kv *return_value = nullptr;
+  for (uint32_t i = 0; i < map->size; i++) {
+    if (strnequal(map->ptr[i].key.via.str.ptr, key, map->ptr[i].key.via.str.size)) {
+      return_value = &map->ptr[i];
+    }
+  }
+
+  return return_value;
+}
+
+#define ASSERT_MAP_HEADER(pointer, val) assert(strnequal((pointer).key.via.str.ptr, val, (pointer).key.via.str.size));
+
+void item_deserialize_check_map(msgpack_object_map *msgpack_map) {
+  LOG_INFO("Item map validation", 0);
+
+  // Check that the received object is indeed an item, it must contain
+  // exactly 6 fields and have exactly the fields we want
+  assert(msgpack_map->size == 6);
+  for (uint32_t i = 0; i < 6; i++) {
+    assert(msgpack_map->ptr[i].key.type == MSGPACK_OBJECT_STR);
+  }
+
+  ASSERT_MAP_HEADER(msgpack_map->ptr[0], "type");
+  ASSERT_MAP_HEADER(msgpack_map->ptr[1], "name");
+  ASSERT_MAP_HEADER(msgpack_map->ptr[2], "weight");
+  ASSERT_MAP_HEADER(msgpack_map->ptr[3], "value");
+  ASSERT_MAP_HEADER(msgpack_map->ptr[4], "coords");
+  ASSERT_MAP_HEADER(msgpack_map->ptr[5], "properties");
+}
+
+void armor_deserialize_check_map(msgpack_object_map *msgmap) {
+  LOG_INFO("Armor map validation", 0);
+
+  assert(msgmap->size == 3);
+  ASSERT_MAP_HEADER(msgmap->ptr[0], "defense_value");
+  ASSERT_MAP_HEADER(msgmap->ptr[1], "armor_class");
+  ASSERT_MAP_HEADER(msgmap->ptr[2], "life_points");
+}
+
+ArmorProperties *armor_deserialize(msgpack_object_map *msgmap) {
+  LOG_INFO("Deserializing armor properties", 0);
+  armor_deserialize_check_map(msgmap);
+
+  ArmorProperties *props = calloc(1, sizeof(ArmorProperties));
+  props->_armor_class = find_key(msgmap, "armor_class")->val.via.u64;
+  props->_life_points = find_key(msgmap, "life_points")->val.via.u64;
+  props->_defense_value = find_key(msgmap, "defense_value")->val.via.u64;
+
+  return props;
+}
+
+void tool_deserialize_check_map(msgpack_object_map *msgmap) {
+  LOG_INFO("Tool map validation", 0);
+
+  assert(msgmap->size == 2);
+  ASSERT_MAP_HEADER(msgmap->ptr[0], "hands");
+  ASSERT_MAP_HEADER(msgmap->ptr[1], "life_points");
+}
+
+ToolProperties *tool_deserialize(msgpack_object_map *msgmap) {
+  LOG_INFO("Deserializing tool properties", 0);
+
+  ToolProperties *props = calloc(1, sizeof(ToolProperties));
+  props->_hands = find_key(msgmap, "hands")->val.via.u64;
+  props->_life_points = find_key(msgmap, "life_points")->val.via.u64;
+
+  return props;
+}
+
+void weapon_deserialize_check_map(msgpack_object_map *msgmap) {
+  LOG_INFO("Weapon map validation", 0);
+
+  assert(msgmap->size == 3);
+  ASSERT_MAP_HEADER(msgmap->ptr[0], "attack_power");
+  ASSERT_MAP_HEADER(msgmap->ptr[1], "life_points");
+  ASSERT_MAP_HEADER(msgmap->ptr[2], "hands");
+}
+
+WeaponProperties *weapon_deserialize(msgpack_object_map *msgmap) {
+  LOG_INFO("Deserializing weapon properties", 0);
+  weapon_deserialize_check_map(msgmap);
+
+  WeaponProperties *props = calloc(1, sizeof(ArmorProperties));
+  props->_attack_power = find_key(msgmap, "attack_power")->val.via.u64;
+  props->_life_points = find_key(msgmap, "life_points")->val.via.u64;
+  props->_hands = find_key(msgmap, "hands")->val.via.u64;
+
+  return props;
+}
+
+Item *item_deserialize(msgpack_object_map *msgpack_map) {
+  LOG_INFO("Starting deserialization of item", 0);
+  item_deserialize_check_map(msgpack_map);
+
+  ItemType item_type = (ItemType)find_key(msgpack_map, "type")->val.via.u64;
+
+  msgpack_object_kv *name_kv = find_key(msgpack_map, "name");
+  char              *name = malloc(name_kv->val.via.str.size);
+  memcpy(name, name_kv->val.via.str.ptr, name_kv->val.via.str.size);
+
+  Item *final_item = item_new(item_type, name, find_key(msgpack_map, "weight")->val.via.u64, find_key(msgpack_map, "value")->val.via.u64);
+
+  msgpack_object_map *props = &find_key(msgpack_map, "properties")->val.via.map;
+
+  // TODO: specialized deserializations here
+  switch (item_type) {
+    case ARMOR:
+      final_item->_properties = armor_deserialize(props);
+      break;
+    case TOOL:
+      final_item->_properties = tool_deserialize(props);
+      break;
+    case WEAPON:
+      final_item->_properties = weapon_deserialize(props);
+      break;
+    case FORAGE:
+    case GEM:
+      final_item->_properties = nullptr;
+      break;
+  }
+
+  free(name);
+  return final_item;
 }
 
 // Specialized serialization

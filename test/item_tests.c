@@ -303,6 +303,77 @@ void item_serialize_test(void) {
   item_type_test_free(armor_test);
 }
 
+#define ASSERT_ITEM_COMMON(prop, lhs, rhs) \
+  { CU_ASSERT_EQUAL(item_get_##prop(lhs), item_get_##prop(rhs)); }
+
+#define ASSERT_ITEM_PROP(fn, lhs, rhs) \
+  { CU_ASSERT_EQUAL(fn(item_get_properties(lhs)), fn(item_get_properties(rhs))); }
+
+void item_deserialize_test(void) {
+  Item *armor = armor_new("Armor 1", 20, 512, 20, 5, 3);
+  Item *pickaxe = tool_new("Pickaxe", 30, 10, 2, 40);
+  Item *weapon = weapon_new("Excalibur", 20, 50, 2, 30, 10);
+  item_set_coords(weapon, 10, 30);
+
+  Item **all_items = calloc(3, sizeof(Item *));
+  all_items[0] = armor;
+  all_items[1] = pickaxe;
+  all_items[2] = weapon;
+
+  Item **all_deserialized = calloc(3, sizeof(Item *));
+
+  for (uint8_t i = 0; i < 3; i++) {
+    Item            *current_item = all_items[i];
+    msgpack_sbuffer *sbuffer = msgpack_sbuffer_new();
+    item_serialize(current_item, sbuffer);
+
+    msgpack_unpacker unpacker;
+    msgpack_unpacker_init(&unpacker, 0);
+    msgpack_unpacker_reserve_buffer(&unpacker, sbuffer->size);
+    memcpy(msgpack_unpacker_buffer(&unpacker), sbuffer->data, sbuffer->size);
+    msgpack_unpacker_buffer_consumed(&unpacker, sbuffer->size);
+
+    // Unpack the object now
+    msgpack_unpacked result;
+    msgpack_unpacked_init(&result);
+
+    CU_ASSERT_EQUAL(msgpack_unpacker_next(&unpacker, &result), MSGPACK_UNPACK_SUCCESS);
+
+    Item *deserialized = item_deserialize(&result.data.via.map);
+    all_deserialized[i] = deserialized;
+
+    ASSERT_ITEM_COMMON(value, deserialized, current_item);
+    ASSERT_ITEM_COMMON(type, deserialized, current_item);
+    ASSERT_ITEM_COMMON(weight, deserialized, current_item);
+    CU_ASSERT_TRUE(strings_equal(item_get_name(deserialized), item_get_name(current_item)));
+
+    msgpack_sbuffer_free(sbuffer);
+    msgpack_unpacker_destroy(&unpacker);
+  }
+
+  // Armor tests
+  ASSERT_ITEM_PROP(armor_get_armor_class, all_deserialized[0], all_items[0]);
+  ASSERT_ITEM_PROP(armor_get_defense_value, all_deserialized[0], all_items[0]);
+  ASSERT_ITEM_PROP(armor_get_life_points, all_deserialized[0], all_items[0]);
+
+  // Tool tests
+  ASSERT_ITEM_PROP(tool_get_hands, all_deserialized[1], all_items[1]);
+  ASSERT_ITEM_PROP(tool_get_life_points, all_deserialized[1], all_items[1]);
+
+  // Weapon tests
+  ASSERT_ITEM_PROP(weapon_get_hands, all_deserialized[2], all_items[2]);
+  ASSERT_ITEM_PROP(weapon_get_life_points, all_deserialized[2], all_items[2]);
+  ASSERT_ITEM_PROP(weapon_get_attack_power, all_deserialized[2], all_items[2]);
+
+  for (uint8_t i = 0; i < 3; i++) {
+    item_free(all_deserialized[i]);
+    item_free(all_items[i]);
+  }
+
+  free(all_items);
+  free(all_deserialized);
+}
+
 void item_test_suite() {
   CU_pSuite suite = CU_add_suite("Items Tests", nullptr, nullptr);
   CU_add_test(suite, "Item creation", &item_new_test);
@@ -310,5 +381,6 @@ void item_test_suite() {
   CU_add_test(suite, "Item coordinates", &item_coordinates_test);
   CU_add_test(suite, "Item clonation", &item_clone_test);
   CU_add_test(suite, "Item serialization", &item_serialize_test);
+  CU_add_test(suite, "Item deserialization", &item_deserialize_test);
 }
 

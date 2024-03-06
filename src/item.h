@@ -2,6 +2,7 @@
 #define __ITEM__H__
 
 #include "point.h"
+#include <msgpack/object.h>
 #include <msgpack/sbuffer.h>
 #include <stdint.h>
 
@@ -22,6 +23,7 @@ typedef enum ForageType { BERRY, WOOD } ForageType;
 // Build a generic Item
 Item *item_new(ItemType, const char *, uint32_t weight, uint32_t value);
 Item *item_clone(Item *);
+Item *item_deserialize(msgpack_object_map *);
 
 bool        item_has_properties(Item *);
 void       *item_get_properties(Item *);
