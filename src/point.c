@@ -30,6 +30,10 @@ inline void point_set_y(Point *point, uint32_t y) {
   point->_y = y;
 }
 
+inline bool points_equal(Point *lhs, Point *rhs) {
+  return lhs->_x == rhs->_x && rhs->_y && lhs->_y;
+}
+
 void point_free(Point *point) {
   free(point);
 }

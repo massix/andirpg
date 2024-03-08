@@ -10,6 +10,7 @@ uint32_t point_get_x(Point *);
 uint32_t point_get_y(Point *);
 void     point_set_x(Point *, uint32_t);
 void     point_set_y(Point *, uint32_t);
+bool     points_equal(Point *, Point *);
 
 void point_free(Point *);
 
