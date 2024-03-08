@@ -259,15 +259,18 @@ void item_serialize_test(void) {
   Item *armor = armor_new("Armor 1", 20, 512, 20, 5, 3);
   Item *pickaxe = tool_new("Pickaxe", 30, 10, 2, 40);
   Item *weapon = weapon_new("Excalibur", 20, 50, 2, 30, 10);
+  Item *generic_item = item_new(FORAGE, "A pear", 10, 3);
   item_set_coords(weapon, 10, 30);
 
   ItemTypeTest *armor_test = item_type_test_new("./armor.bin", armor);
   ItemTypeTest *pickaxe_test = item_type_test_new("./pickaxe.bin", pickaxe);
   ItemTypeTest *weapon_test = item_type_test_new("./weapon.bin", weapon);
+  ItemTypeTest *generic_test = item_type_test_new("./generic.bin", generic_item);
 
   item_type_test_complete(armor_test);
   item_type_test_complete(pickaxe_test);
   item_type_test_complete(weapon_test);
+  item_type_test_complete(generic_test);
 
   msgpack_object_kv *armor_properties = item_type_test_get_properties(armor_test);
   CU_ASSERT_PTR_NOT_NULL(armor_properties);
@@ -289,7 +292,6 @@ void item_serialize_test(void) {
 
   msgpack_object_kv *weapon_properties = item_type_test_get_properties(weapon_test);
   CU_ASSERT_PTR_NOT_NULL(weapon_properties);
-  CU_ASSERT_PTR_NOT_NULL(weapon_properties);
   CU_ASSERT_EQUAL(weapon_properties->val.type, MSGPACK_OBJECT_MAP);
   CU_ASSERT_EQUAL(msgpack_map_get_key(&weapon_properties->val.via.map, "hands")->val.via.u64,
                   weapon_get_hands(item_get_properties(weapon)));
@@ -298,6 +300,12 @@ void item_serialize_test(void) {
   CU_ASSERT_EQUAL(msgpack_map_get_key(&weapon_properties->val.via.map, "attack_power")->val.via.u64,
                   weapon_get_attack_power(item_get_properties(weapon)));
 
+  // Generic items should not have properties (yet)
+  msgpack_object_kv *generic_properties = item_type_test_get_properties(generic_test);
+  CU_ASSERT_PTR_NOT_NULL(generic_properties);
+  CU_ASSERT_EQUAL(generic_properties->val.type, MSGPACK_OBJECT_NIL);
+
+  item_type_test_free(generic_test);
   item_type_test_free(weapon_test);
   item_type_test_free(pickaxe_test);
   item_type_test_free(armor_test);
