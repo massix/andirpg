@@ -3,6 +3,7 @@
 
 #include "entity.h"
 #include "item.h"
+#include <msgpack/object.h>
 #include <msgpack/sbuffer.h>
 #include <ncurses.h>
 #include <stdint.h>
@@ -16,6 +17,8 @@ typedef struct MapBoundaries {
 
 // Constructors
 Map *map_new(uint32_t x_size, uint32_t y_size, uint32_t max_entities);
+Map *map_deserialize(msgpack_object_map *);
+
 void map_dump_to_file(Map *, const char *path);
 Map *map_from_string(const char *);
 

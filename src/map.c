@@ -1,8 +1,11 @@
 #include "map.h"
 #include "entity.h"
 #include "item.h"
+#include "logger.h"
 #include "point.h"
 #include "utils.h"
+#include <assert.h>
+#include <msgpack/object.h>
 #include <msgpack/pack.h>
 #include <msgpack/sbuffer.h>
 #include <msgpack/unpack.h>
@@ -255,6 +258,51 @@ MapBoundaries map_get_boundaries(Map *map) {
   boundaries.y = map->_y_size;
 
   return boundaries;
+}
+
+#define ASSERT_MAP_KEY(mmap, head) assert(strncmp((mmap).key.via.str.ptr, head, strlen(head)) == 0)
+
+Map *map_deserialize(msgpack_object_map *msgpack_map) {
+  LOG_INFO("Unmarshalling map", 0);
+  Map *map = calloc(1, sizeof(Map));
+
+  // Check the validity of the map before starting the Unmarshalling process
+  assert(msgpack_map->size == 6);
+  ASSERT_MAP_KEY(msgpack_map->ptr[0], "x_size");
+  ASSERT_MAP_KEY(msgpack_map->ptr[1], "y_size");
+  ASSERT_MAP_KEY(msgpack_map->ptr[2], "max_entities");
+  ASSERT_MAP_KEY(msgpack_map->ptr[3], "last_index");
+  ASSERT_MAP_KEY(msgpack_map->ptr[4], "entities");
+  ASSERT_MAP_KEY(msgpack_map->ptr[5], "items");
+
+  uint items_size = msgpack_map->ptr[5].val.via.array.size;
+  uint entities_size = msgpack_map->ptr[4].val.via.array.size;
+
+  map->_x_size = msgpack_map->ptr[0].val.via.u64;
+  map->_y_size = msgpack_map->ptr[1].val.via.u64;
+  map->_entities_size = msgpack_map->ptr[2].val.via.u64;
+  map->_last_index = msgpack_map->ptr[3].val.via.u64;
+  map->_items_size = items_size;
+
+  map->_entities = calloc(map->_entities_size, sizeof(Entity *));
+  for (uint i = 0; i < map->_entities_size; i++) {
+    map->_entities[i] = nullptr;
+  }
+
+  for (uint i = 0; i < entities_size; i++) {
+    msgpack_object_map entity_map = msgpack_map->ptr[4].val.via.array.ptr[i].via.map;
+    map->_entities[i] = entity_deserialize(&entity_map);
+  }
+
+  // +1 because we need to allocate the nullptr
+  map->_items = calloc(items_size + 1, sizeof(Item *));
+  map->_items[items_size] = nullptr;
+  for (uint i = 0; i < msgpack_map->ptr[5].val.via.array.size; i++) {
+    msgpack_object_map item_map = msgpack_map->ptr[5].val.via.array.ptr[i].via.map;
+    map->_items[i] = item_deserialize(&item_map);
+  }
+
+  return map;
 }
 
 void map_serialize(Map *map, msgpack_sbuffer *buffer) {

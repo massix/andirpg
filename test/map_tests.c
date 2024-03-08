@@ -4,6 +4,7 @@
 #include "utils.h"
 #include <CUnit/CUnit.h>
 #include <CUnit/TestDB.h>
+#include <CUnit/TestRun.h>
 #include <asm-generic/fcntl.h>
 #include <entity.h>
 #include <msgpack/object.h>
@@ -210,9 +211,7 @@ void check_msgpack_key(msgpack_object *obj, const char *key) {
   free(str);
 }
 
-void map_serialization_test() {
-  const char *filename = "map_serialization_test.bin";
-
+Map *create_serde_map() {
   Map *map = map_new(42, 23, 15);
   map_add_entity(map, entity_new(30, HUMAN, "E1", 12, 0));
   map_add_entity(map, entity_new(15, INHUMAN, "E2", 13, 1));
@@ -222,6 +221,14 @@ void map_serialization_test() {
   map_add_item(map, armor_new("A tee-shirt", 30, 15, 16, 3, 3), 10, 1);
   map_add_item(map, armor_new("A blue-jeans", 30, 15, 16, 3, 3), 10, 1);
   map_add_item(map, armor_new("A hat", 30, 15, 16, 3, 3), 10, 1);
+
+  return map;
+}
+
+void map_serialization_test() {
+  const char *filename = "map_serialization_test.bin";
+
+  Map *map = create_serde_map();
 
   msgpack_sbuffer sbuffer;
   msgpack_sbuffer_init(&sbuffer);
@@ -302,6 +309,46 @@ void map_serialization_test() {
   map_free(map);
 }
 
+void map_deserialize_test(void) {
+  Map *map = create_serde_map();
+
+  msgpack_sbuffer sbuffer;
+  msgpack_sbuffer_init(&sbuffer);
+
+  map_serialize(map, &sbuffer);
+  CU_ASSERT_PTR_NOT_NULL(sbuffer.data);
+  CU_ASSERT_FALSE(sbuffer.size == 0);
+
+  msgpack_unpacker unpacker;
+  msgpack_unpacker_init(&unpacker, 0);
+  msgpack_unpacker_reserve_buffer(&unpacker, sbuffer.size);
+  memcpy(msgpack_unpacker_buffer(&unpacker), sbuffer.data, sbuffer.size);
+  msgpack_unpacker_buffer_consumed(&unpacker, sbuffer.size);
+
+  msgpack_unpacked result;
+  msgpack_unpacked_init(&result);
+
+  CU_ASSERT_EQUAL(msgpack_unpacker_next(&unpacker, &result), MSGPACK_UNPACK_SUCCESS);
+
+  Map          *deserialized = map_deserialize(&result.data.via.map);
+  MapBoundaries original_boundaries = map_get_boundaries(map);
+  MapBoundaries deser_boundaries = map_get_boundaries(deserialized);
+
+  CU_ASSERT_EQUAL(original_boundaries.x, deser_boundaries.x);
+  CU_ASSERT_EQUAL(original_boundaries.y, deser_boundaries.y);
+
+  CU_ASSERT_EQUAL(map_count_items(map), map_count_items(deserialized));
+  CU_ASSERT_EQUAL(map_count_entities(map), map_count_entities(deserialized));
+
+  CU_ASSERT_PTR_NOT_NULL(map_get_item(deserialized, "A blue-jeans"));
+  CU_ASSERT_PTR_NOT_NULL(map_get_entity(deserialized, "E2"));
+
+  msgpack_unpacked_destroy(&result);
+  msgpack_unpacker_destroy(&unpacker);
+  map_free(deserialized);
+  map_free(map);
+}
+
 void map_test_suite() {
   CU_pSuite suite = CU_add_suite("Map Tests", nullptr, nullptr);
   CU_add_test(suite, "Creation", &map_creation_test);
@@ -309,5 +356,6 @@ void map_test_suite() {
   CU_add_test(suite, "Handle Items", &map_items_test);
   CU_add_test(suite, "Serialization", &map_dump_test);
   CU_add_test(suite, "Msgpack Serialization", &map_serialization_test);
+  CU_add_test(suite, "Msgpack Deserialization", &map_deserialize_test);
 }
 
