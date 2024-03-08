@@ -108,8 +108,6 @@ void item_serialize(Item *item, msgpack_sbuffer *buffer) {
       msgpack_pack_nil(&packer);
       break;
   }
-
-  msgpack_pack_nil(&packer);
 }
 
 bool strnequal(const char *lhs, const char *rhs, size_t size) {
