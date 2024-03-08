@@ -288,6 +288,50 @@ void entity_serialization_test() {
   entity_free(entity);
 }
 
+void entity_deserialize_test(void) {
+  msgpack_sbuffer buffer;
+  msgpack_sbuffer_init(&buffer);
+  Entity *entity = entity_new(10, ANIMAL, "Bounty the cat", 10, 11);
+  entity_inventory_add_item(entity, armor_new("Hairy armor", 10, 10, 0, 0, 15));
+  entity_inventory_add_item(entity, tool_new("Lighter", 1, 1, 1, 10));
+  entity_inventory_add_item(entity, item_new(FORAGE, "An apple", 1, 1));
+
+  entity_hurt(entity, 3);
+  entity_serialize(entity, &buffer);
+
+  msgpack_unpacker unpacker;
+  msgpack_unpacker_init(&unpacker, 0);
+  msgpack_unpacker_reserve_buffer(&unpacker, buffer.size);
+  memcpy(msgpack_unpacker_buffer(&unpacker), buffer.data, buffer.size);
+  msgpack_unpacker_buffer_consumed(&unpacker, buffer.size);
+
+  msgpack_unpacked result;
+  msgpack_unpacked_init(&result);
+
+  CU_ASSERT_EQUAL(msgpack_unpacker_next(&unpacker, &result), MSGPACK_UNPACK_SUCCESS);
+
+  Entity *rebuilt = entity_deserialize(&result.data.via.map);
+  CU_ASSERT_TRUE(strings_equal(entity_get_name(entity), entity_get_name(rebuilt)));
+  CU_ASSERT_TRUE(points_equal(entity_get_coords(entity), entity_get_coords(rebuilt)));
+  CU_ASSERT_EQUAL(entity_get_life_points(entity), entity_get_life_points(rebuilt));
+  CU_ASSERT_EQUAL(entity_get_starting_life_points(entity), entity_get_starting_life_points(rebuilt));
+  CU_ASSERT_EQUAL(*entity_get_entity_type(entity), *entity_get_entity_type(rebuilt));
+  CU_ASSERT_EQUAL(entity_inventory_count(entity), entity_inventory_count(rebuilt));
+
+  Item **entity_inventory = entity_inventory_get(entity);
+  Item **rebuilt_inventory = entity_inventory_get(rebuilt);
+
+  for (uint i = 0; i < entity_inventory_count(rebuilt); i++) {
+    // We're not checking the whole item since that is already done in the item_test
+    CU_ASSERT_EQUAL(item_get_type(entity_inventory[i]), item_get_type(rebuilt_inventory[i]));
+  }
+
+  msgpack_unpacker_destroy(&unpacker);
+  msgpack_sbuffer_destroy(&buffer);
+  entity_free(entity);
+  entity_free(rebuilt);
+}
+
 void entity_test_suite() {
   CU_pSuite suite = CU_add_suite("Entity Tests", nullptr, nullptr);
   CU_add_test(suite, "Create a basic entity", &entity_creation_test);
@@ -296,6 +340,7 @@ void entity_test_suite() {
   CU_add_test(suite, "Resurrect entities", &entity_resurrect_test);
   CU_add_test(suite, "To/From string", &entity_to_string_test);
   CU_add_test(suite, "Serialization", &entity_serialization_test);
+  CU_add_test(suite, "Deserialization", &entity_deserialize_test);
   CU_add_test(suite, "Inventory manipulation", &entity_inventory_test);
 }
 

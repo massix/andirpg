@@ -2,6 +2,8 @@
 #define __ENTITY__H__
 
 #include "item.h"
+#include <msgpack/object.h>
+#include <msgpack/pack.h>
 #include <msgpack/sbuffer.h>
 #include <point.h>
 #include <stdint.h>
@@ -15,6 +17,7 @@ const char *entity_type_to_string(EntityType);
 char        entity_type_to_char(EntityType);
 
 Entity *entity_new(uint32_t starting_lp, EntityType type, const char *name, uint32_t start_x, uint32_t start_y);
+Entity *entity_deserialize(msgpack_object_map *);
 
 Entity  *entity_from_string(const char *);
 char    *entity_to_string(Entity *);

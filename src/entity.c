@@ -3,6 +3,8 @@
 #include "logger.h"
 #include "point.h"
 #include "utils.h"
+#include <assert.h>
+#include <msgpack/object.h>
 #include <msgpack/pack.h>
 #include <msgpack/sbuffer.h>
 #include <stdint.h>
@@ -54,6 +56,43 @@ Entity *entity_new(uint32_t starting_lp, EntityType type, const char *name, uint
   ret->_inventory[0] = nullptr;
   ret->_coords = point_new(start_x, start_y);
   return ret;
+}
+
+#define ASSERT_MAP_KEY(mapkey, val) assert(strncmp((mapkey).key.via.str.ptr, val, (mapkey).key.via.str.size) == 0)
+
+Entity *entity_deserialize(msgpack_object_map *map) {
+  LOG_INFO("Unmarshalling entity", 0);
+  LOG_INFO("Validating map", 0);
+  assert(map->size == 6);
+  ASSERT_MAP_KEY(map->ptr[0], "current_lp");
+  ASSERT_MAP_KEY(map->ptr[1], "starting_lp");
+  ASSERT_MAP_KEY(map->ptr[2], "type");
+  ASSERT_MAP_KEY(map->ptr[3], "name");
+  ASSERT_MAP_KEY(map->ptr[4], "coords");
+  ASSERT_MAP_KEY(map->ptr[5], "inventory");
+
+  uint32_t   current_lp = map->ptr[0].val.via.u64;
+  uint32_t   starting_lp = map->ptr[1].val.via.u64;
+  EntityType type = map->ptr[2].val.via.u64;
+  Point     *coords = point_new(map->ptr[4].val.via.array.ptr[0].via.u64, map->ptr[4].val.via.array.ptr[1].via.u64);
+
+  Entity *entity = calloc(1, sizeof(Entity));
+  entity->_starting_lp = starting_lp;
+  entity->_type = type;
+  entity->_lp = current_lp;
+  entity->_coords = coords;
+  entity->_name = calloc(map->ptr[3].val.via.str.size, sizeof(char));
+  memcpy(entity->_name, map->ptr[3].val.via.str.ptr, map->ptr[3].val.via.str.size);
+
+  uint32_t inventory_size = map->ptr[5].val.via.array.size;
+
+  entity->_inventory = calloc(inventory_size + 1 /* for the null pointer */, sizeof(Item *));
+  entity->_inventory[inventory_size] = nullptr;
+  for (uint i = 0; i < inventory_size; i++) {
+    entity->_inventory[i] = item_deserialize(&(map->ptr[5].val.via.array.ptr[i].via.map));
+  }
+
+  return entity;
 }
 
 char *entity_to_string(Entity *entity) {
@@ -152,8 +191,9 @@ void entity_serialize(Entity *ent, msgpack_sbuffer *buffer) {
   msgpack_pack_uint32(&packer, point_get_y(ent->_coords));
 
   msgpack_pack_str_with_body(&packer, k_inventory->str, k_inventory->len);
-  msgpack_pack_array(&packer, entity_inventory_count(ent));
-  for (uint32_t i = 0; i < entity_inventory_count(ent); i++) {
+  uint32_t inventory_count = entity_inventory_count(ent);
+  msgpack_pack_array(&packer, inventory_count);
+  for (uint32_t i = 0; i < inventory_count; i++) {
     item_serialize(ent->_inventory[i], buffer);
   }
 
