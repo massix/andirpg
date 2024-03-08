@@ -3,6 +3,7 @@
 
 #include "entity.h"
 #include "map.h"
+#include <msgpack/object.h>
 #include <msgpack/sbuffer.h>
 #include <stdint.h>
 #include <sys/types.h>
@@ -10,6 +11,7 @@
 typedef struct Engine Engine;
 
 Engine *engine_new(Map *);
+Engine *engine_deserialize(msgpack_object_map const *);
 
 Map     *engine_get_map(Engine *);
 void     engine_add_entity(Engine *, Entity *);

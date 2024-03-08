@@ -374,6 +374,38 @@ void engine_serialize_test(void) {
   engine_free(engine);
 }
 
+void engine_deserialize_test(void) {
+  Engine *engine = engine_new(map_new(20, 20, 10));
+  map_add_entity(engine_get_map(engine), entity_new(30, HUMAN, "Active player", 0, 0));
+  engine_set_active_entity(engine, "Active player");
+
+  msgpack_sbuffer sbuffer;
+  msgpack_sbuffer_init(&sbuffer);
+
+  engine_serialize(engine, &sbuffer);
+
+  msgpack_unpacker unpacker;
+  msgpack_unpacker_init(&unpacker, sbuffer.size);
+  memcpy(msgpack_unpacker_buffer(&unpacker), sbuffer.data, sbuffer.size);
+  msgpack_unpacker_buffer_consumed(&unpacker, sbuffer.size);
+
+  msgpack_unpacked result;
+  msgpack_unpacked_init(&result);
+
+  CU_ASSERT_EQUAL(msgpack_unpacker_next(&unpacker, &result), MSGPACK_UNPACK_SUCCESS);
+  Engine *rebuilt = engine_deserialize(&result.data.via.map);
+
+  CU_ASSERT_EQUAL(engine_get_current_cycle(rebuilt), engine_get_current_cycle(engine));
+  CU_ASSERT_TRUE(strings_equal(entity_get_name(engine_get_active_entity(engine)), entity_get_name(engine_get_active_entity(rebuilt))));
+  CU_ASSERT_PTR_NOT_NULL(engine_get_map(rebuilt));
+
+  msgpack_unpacked_destroy(&result);
+  msgpack_unpacker_destroy(&unpacker);
+  msgpack_sbuffer_destroy(&sbuffer);
+  engine_free(engine);
+  engine_free(rebuilt);
+}
+
 void engine_test_suite() {
   CU_pSuite suite = CU_add_suite("Engine Tests", nullptr, nullptr);
   CU_add_test(suite, "Engine creation", &engine_creation_test);
@@ -382,5 +414,6 @@ void engine_test_suite() {
   CU_add_test(suite, "Engine keypress", &engine_keypress_test);
   CU_add_test(suite, "Engine attacks", &engine_attack_test);
   CU_add_test(suite, "Engine serialization", &engine_serialize_test);
+  CU_add_test(suite, "Engine deserialization", &engine_deserialize_test);
 }
 

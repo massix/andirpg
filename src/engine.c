@@ -2,7 +2,9 @@
 #include "entity.h"
 #include "logger.h"
 #include "map.h"
+#include <assert.h>
 #include <msgpack.h>
+#include <msgpack/object.h>
 #include <msgpack/pack.h>
 #include <msgpack/sbuffer.h>
 #include <point.h>
@@ -191,6 +193,30 @@ inline uint32_t engine_get_current_cycle(Engine *eng) {
 }
 
 #define PACK_MAP_KEY(packer, key) msgpack_pack_str_with_body(&(packer), key, strlen(key))
+#define ASSERT_MAP_KEY(mk, k)     assert(strncmp((mk).key.via.str.ptr, k, strlen(k)) == 0)
+
+Engine *engine_deserialize(msgpack_object_map const *map) {
+  assert(map->size == 3);
+  ASSERT_MAP_KEY(map->ptr[0], "active_entity");
+  ASSERT_MAP_KEY(map->ptr[1], "current_cycle");
+  ASSERT_MAP_KEY(map->ptr[2], "map_object");
+
+  Engine *engine = calloc(1, sizeof(Engine));
+  engine->_current_cycle = map->ptr[1].val.via.u64;
+  engine->_map = map_deserialize(&map->ptr[2].val.via.map);
+
+  if (map->ptr[0].val.type == MSGPACK_OBJECT_STR) {
+    msgpack_object_str const *entity_object = &map->ptr[0].val.via.str;
+
+    char entity_name[entity_object->size];
+    memcpy(entity_name, entity_object->ptr, entity_object->size);
+    engine->_active_entity = map_get_entity(engine->_map, entity_name);
+  } else {
+    engine->_active_entity = nullptr;
+  }
+
+  return engine;
+}
 
 void engine_serialize(Engine *eng, msgpack_sbuffer *buffer) {
   LOG_DEBUG("Starting packer for engine 0x%p", eng);
