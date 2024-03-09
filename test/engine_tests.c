@@ -17,14 +17,14 @@
 #include <unistd.h>
 
 void engine_creation_test(void) {
-  Engine *engine = engine_new(map_new(20, 20, 10));
+  Engine *engine = engine_new(map_new(20, 20, 10, "Some map"));
   CU_ASSERT_PTR_NOT_NULL(engine);
 
   engine_free(engine);
 }
 
 void engine_entities_test(void) {
-  Map    *map = map_new(20, 20, 10);
+  Map    *map = map_new(20, 20, 10, "Some map");
   Engine *engine = engine_new(map);
   engine_add_entity(engine, entity_new(30, HUMAN, "e1", 0, 0));
 
@@ -46,7 +46,7 @@ void engine_entities_test(void) {
 }
 
 void engine_close_entities_test(void) {
-  Engine *engine = engine_new(map_new(20, 20, 8));
+  Engine *engine = engine_new(map_new(20, 20, 8, "Some map"));
   engine_add_entity(engine, entity_new(10, INHUMAN, "z1", 0, 1));
   engine_add_entity(engine, entity_new(10, HUMAN, "h1", 1, 1));
   engine_add_entity(engine, entity_new(10, INHUMAN, "z2", 2, 1));
@@ -70,7 +70,7 @@ void engine_close_entities_test(void) {
 }
 
 void engine_keypress_test(void) {
-  Engine *engine = engine_new(map_new(5, 5, 10));
+  Engine *engine = engine_new(map_new(5, 5, 10, "Some map"));
   Entity *active = entity_new(30, ANIMAL, "e4", 3, 0);
   engine_add_entity(engine, entity_new(30, HUMAN, "e1", 0, 0));
   engine_add_entity(engine, entity_new(30, ANIMAL, "e2", 1, 0));
@@ -205,7 +205,7 @@ void engine_keypress_test(void) {
 }
 
 void engine_attack_test(void) {
-  Engine *engine = engine_new(map_new(20, 20, 10));
+  Engine *engine = engine_new(map_new(20, 20, 10, "Some map"));
   // These two entities are close, they can attack each other
   Entity *human1 = entity_new(10, HUMAN, "h1", 10, 10);
   Entity *zombie = entity_new(8, INHUMAN, "z1", 9, 11);
@@ -256,7 +256,7 @@ void engine_serialize_test(void) {
   msgpack_sbuffer buffer;
   msgpack_sbuffer_init(&buffer);
 
-  Engine *engine = engine_new(map_new(20, 20, 10));
+  Engine *engine = engine_new(map_new(20, 20, 10, "Some map"));
   map_add_entity(engine_get_map(engine), entity_new(30, HUMAN, "Active player", 0, 0));
   engine_set_active_entity(engine, "Active player");
 
@@ -375,7 +375,7 @@ void engine_serialize_test(void) {
 }
 
 void engine_deserialize_test(void) {
-  Engine *engine = engine_new(map_new(20, 20, 10));
+  Engine *engine = engine_new(map_new(20, 20, 10, "Some map"));
   map_add_entity(engine_get_map(engine), entity_new(30, HUMAN, "Active player", 0, 0));
   engine_set_active_entity(engine, "Active player");
 

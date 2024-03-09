@@ -37,7 +37,7 @@ WINDOW *init_ncurses() {
 
 Engine *init_game(Configuration *configuration) {
   assert(configuration != nullptr);
-  Engine *engine = engine_new(map_new(10, 10, 20));
+  Engine *engine = engine_new(map_new(10, 10, 20, "Rimini Centro"));
 
   // The player
   engine_add_entity(

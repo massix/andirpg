@@ -39,7 +39,7 @@ MapWindow *map_window_new(Map *map, int lines, int cols, int x, int y) {
   ret->_ui_point = ui_point_new(x, y);
 
   ret->_map = map;
-  ret->_window = boxed_window_new(&bwo, "Rimini Centro", lines, cols, y, x, nullptr);
+  ret->_window = boxed_window_new(&bwo, map_get_name(map), lines, cols, y, x, nullptr);
 
   return ret;
 }

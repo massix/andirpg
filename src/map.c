@@ -35,6 +35,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 
 struct Map {
@@ -43,16 +44,18 @@ struct Map {
   uint32_t _last_index;
   uint32_t _entities_size;
   uint32_t _items_size;
+  char    *_name;
   Entity **_entities;
   Item   **_items;
 };
 
-Map *map_new(uint32_t x_size, uint32_t y_size, uint32_t max_entities) {
+Map *map_new(uint32_t x_size, uint32_t y_size, uint32_t max_entities, char const *name) {
   Map *ret = calloc(1, sizeof(Map));
   ret->_x_size = x_size;
   ret->_y_size = y_size;
   ret->_last_index = 0;
   ret->_entities_size = max_entities;
+  ret->_name = strdup(name);
 
   ret->_entities = calloc(max_entities, sizeof(Entity *));
   for (uint32_t i = 0; i < max_entities; i++) {
@@ -180,6 +183,10 @@ Entity *map_get_entity(Map *map, const char *name) {
   return ret;
 }
 
+inline char const *map_get_name(Map const *map) {
+  return map->_name;
+}
+
 int map_get_index_of_entity(Map *map, const char *name) {
   int32_t index = -1;
   for (int32_t i = 0; i < map->_last_index; i++) {
@@ -264,21 +271,25 @@ Map *map_deserialize(msgpack_object_map *msgpack_map) {
   Map *map = calloc(1, sizeof(Map));
 
   // Check the validity of the map before starting the Unmarshalling process
-  assert(msgpack_map->size == 6);
+  assert(msgpack_map->size == 7);
   serde_map_assert(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "x_size");
   serde_map_assert(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "y_size");
   serde_map_assert(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "max_entities");
   serde_map_assert(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "last_index");
+  serde_map_assert(msgpack_map, MSGPACK_OBJECT_STR, "name");
   serde_map_assert(msgpack_map, MSGPACK_OBJECT_ARRAY, "entities");
   serde_map_assert(msgpack_map, MSGPACK_OBJECT_ARRAY, "items");
 
   msgpack_object_array const *items = serde_map_get(msgpack_map, MSGPACK_OBJECT_ARRAY, "items");
   msgpack_object_array const *entities = serde_map_get(msgpack_map, MSGPACK_OBJECT_ARRAY, "entities");
+  msgpack_object_str const   *name = serde_map_get(msgpack_map, MSGPACK_OBJECT_STR, "name");
 
   map->_x_size = *(uint32_t *)serde_map_get(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "x_size");
   map->_y_size = *(uint32_t *)serde_map_get(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "y_size");
   map->_entities_size = *(uint32_t *)serde_map_get(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "max_entities");
   map->_last_index = *(uint32_t *)serde_map_get(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "last_index");
+  map->_name = malloc(name->size);
+  memcpy(map->_name, name->ptr, name->size);
   map->_items_size = items->size;
 
   map->_entities = calloc(map->_entities_size, sizeof(Entity *));
@@ -307,13 +318,16 @@ void map_serialize(Map *map, msgpack_sbuffer *buffer) {
   msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
 
   // Map is a dictionary
-  msgpack_pack_map(&packer, 6);
+  msgpack_pack_map(&packer, 7);
 
   serde_pack_str(&packer, "x_size");
   msgpack_pack_uint32(&packer, map->_x_size);
 
   serde_pack_str(&packer, "y_size");
   msgpack_pack_uint32(&packer, map->_y_size);
+
+  serde_pack_str(&packer, "name");
+  serde_pack_str(&packer, map->_name);
 
   serde_pack_str(&packer, "max_entities");
   msgpack_pack_uint32(&packer, map->_entities_size);
@@ -347,6 +361,7 @@ void map_free(Map *map) {
   }
 
   free(map->_entities);
+  free(map->_name);
   free(map);
 }
 

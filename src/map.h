@@ -37,7 +37,7 @@ typedef struct MapBoundaries {
 } MapBoundaries;
 
 // Constructors
-Map *map_new(uint32_t x_size, uint32_t y_size, uint32_t max_entities);
+Map *map_new(uint32_t x_size, uint32_t y_size, uint32_t max_entities, char const *);
 Map *map_deserialize(msgpack_object_map *);
 
 void          map_add_entity(Map *, Entity *);
@@ -45,6 +45,7 @@ void          map_add_item(Map *, Item *, uint32_t x, uint32_t y);
 void          map_remove_item(Map *, const char *);
 bool          map_contains_item(Map *, const char *);
 uint32_t      map_count_items(Map *);
+char const   *map_get_name(Map const *);
 Item         *map_get_item(Map *, const char *);
 Entity       *map_get_entity(Map *, const char *);
 Entity      **map_get_all_entities(Map *);

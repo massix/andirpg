@@ -1,6 +1,7 @@
 #include "item.h"
 #include "map.h"
 #include "point.h"
+#include "serde.h"
 #include "utils.h"
 #include <CUnit/CUnit.h>
 #include <CUnit/TestDB.h>
@@ -18,12 +19,13 @@
 #include <unistd.h>
 
 void map_creation_test(void) {
-  Map *map = map_new(20, 20, 15);
+  Map *map = map_new(20, 20, 15, "MapName");
   CU_ASSERT_PTR_NOT_NULL(map);
 
   MapBoundaries boundaries = map_get_boundaries(map);
   CU_ASSERT_EQUAL(boundaries.x, 20);
   CU_ASSERT_EQUAL(boundaries.y, 20);
+  CU_ASSERT_TRUE(strings_equal(map_get_name(map), "MapName"));
 
   map_free(map);
 }
@@ -33,7 +35,7 @@ bool filter_zombies(Entity *entity) {
 }
 
 void map_entities_test(void) {
-  Map *map = map_new(20, 20, 15);
+  Map *map = map_new(20, 20, 15, "MapName");
   map_add_entity(map, entity_new(30, INHUMAN, "e1", 10, 10));
   map_add_entity(map, entity_new(15, ANIMAL, "e2", 10, 12));
   map_add_entity(map, entity_new(15, HUMAN, "e3", 9, 12));
@@ -91,7 +93,7 @@ void map_entities_test(void) {
 }
 
 void map_items_test(void) {
-  Map *map = map_new(20, 20, 20);
+  Map *map = map_new(20, 20, 20, "MapName");
   CU_ASSERT_FALSE(map_contains_item(map, "Non existing"));
 
   map_add_item(map, weapon_new("Some weapon", 20, 10, 1, 10, 30), 3, 2);
@@ -127,7 +129,7 @@ void check_msgpack_key(msgpack_object *obj, const char *key) {
 }
 
 Map *create_serde_map() {
-  Map *map = map_new(42, 23, 15);
+  Map *map = map_new(42, 23, 15, "Serde serializable map");
   map_add_entity(map, entity_new(30, HUMAN, "E1", 12, 0));
   map_add_entity(map, entity_new(15, INHUMAN, "E2", 13, 1));
 
@@ -183,39 +185,34 @@ void map_serialization_test() {
 
   CU_ASSERT_EQUAL(msgpack_unpacker_next(&unpacker, &result), MSGPACK_UNPACK_SUCCESS);
   CU_ASSERT_EQUAL(result.data.type, MSGPACK_OBJECT_MAP);
-  CU_ASSERT_EQUAL(result.data.via.map.size, 6);
+  CU_ASSERT_EQUAL(result.data.via.map.size, 7);
 
-  msgpack_object_kv *map_objects = result.data.via.map.ptr;
+  msgpack_object_map *msgmap = &result.data.via.map;
 
-  // First object should be "x_size" => 42
-  check_msgpack_key(&map_objects[0].key, "x_size");
-  CU_ASSERT_EQUAL(map_objects[0].val.via.u64, 42);
+  serde_map_assert(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "x_size");
+  CU_ASSERT_EQUAL(*(uint32_t *)serde_map_get(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "x_size"), 42);
 
-  // Second object should be "y_size" => 23
-  check_msgpack_key(&map_objects[1].key, "y_size");
-  CU_ASSERT_EQUAL(map_objects[1].val.via.u64, 23);
+  serde_map_assert(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "y_size");
+  CU_ASSERT_EQUAL(*(uint32_t *)serde_map_get(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "y_size"), 23);
 
-  // Third object should be "max_entities" => 15
-  check_msgpack_key(&map_objects[2].key, "max_entities");
-  CU_ASSERT_EQUAL(map_objects[2].val.via.u64, 15);
+  serde_map_assert(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "max_entities");
+  CU_ASSERT_EQUAL(*(uint32_t *)serde_map_get(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "max_entities"), 15);
 
-  // Fourth object should be "last_index" => 2
-  check_msgpack_key(&map_objects[3].key, "last_index");
-  CU_ASSERT_EQUAL(map_objects[3].val.via.u64, 2);
+  serde_map_assert(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "last_index");
+  CU_ASSERT_EQUAL(*(uint32_t *)serde_map_get(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "last_index"), 2);
 
-  // Fifth index should be "entities", containing 2 entities
+  serde_map_assert(msgmap, MSGPACK_OBJECT_STR, "name");
+  serde_str_equal(serde_map_get(msgmap, MSGPACK_OBJECT_STR, "name"), "Serde serializable map");
+
   // We're not checking the validity of the entities here, since that is already
   // tested elsewhere.
-  check_msgpack_key(&map_objects[4].key, "entities");
-  CU_ASSERT_EQUAL(map_objects[4].val.type, MSGPACK_OBJECT_ARRAY);
-  CU_ASSERT_EQUAL(map_objects[4].val.via.array.size, 2);
+  serde_map_assert(msgmap, MSGPACK_OBJECT_ARRAY, "entities");
+  CU_ASSERT_EQUAL(((msgpack_object_array *)serde_map_get(msgmap, MSGPACK_OBJECT_ARRAY, "entities"))->size, 2);
 
-  // Sixth index should be "items", containing 4 items
   // We're not checking the validity of the items here, since that is already
   // tested elsewhere.
-  check_msgpack_key(&map_objects[5].key, "items");
-  CU_ASSERT_EQUAL(map_objects[5].val.type, MSGPACK_OBJECT_ARRAY);
-  CU_ASSERT_EQUAL(map_objects[5].val.via.array.size, 4);
+  serde_map_assert(msgmap, MSGPACK_OBJECT_ARRAY, "items");
+  CU_ASSERT_EQUAL(((msgpack_object_array *)serde_map_get(msgmap, MSGPACK_OBJECT_ARRAY, "items"))->size, 4);
 
   free(buffer);
   msgpack_sbuffer_destroy(&sbuffer);
@@ -257,6 +254,8 @@ void map_deserialize_test(void) {
 
   CU_ASSERT_PTR_NOT_NULL(map_get_item(deserialized, "A blue-jeans"));
   CU_ASSERT_PTR_NOT_NULL(map_get_entity(deserialized, "E2"));
+
+  CU_ASSERT_TRUE(strings_equal(map_get_name(map), map_get_name(deserialized)));
 
   msgpack_unpacked_destroy(&result);
   msgpack_unpacker_destroy(&unpacker);
