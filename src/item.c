@@ -1,6 +1,7 @@
 #include "item.h"
 #include "logger.h"
 #include "point.h"
+#include "serde.h"
 #include <assert.h>
 #include <msgpack/object.h>
 #include <msgpack/pack.h>
@@ -50,8 +51,6 @@ Item *item_new(ItemType item_type, const char *name, uint32_t weight, uint32_t v
   return ret;
 }
 
-#define WRITE_MAP_KEY(packer, key) msgpack_pack_str_with_body(&(packer), #key, strlen(#key))
-
 // Forward declarations
 void armor_serialize(Item *, msgpack_packer *);
 void tool_serialize(Item *, msgpack_packer *);
@@ -66,19 +65,19 @@ void item_serialize(Item *item, msgpack_sbuffer *buffer) {
   msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
   msgpack_pack_map(&packer, 6);
 
-  WRITE_MAP_KEY(packer, type);
+  serde_pack_str(&packer, "type");
   msgpack_pack_uint8(&packer, item->_type);
 
-  WRITE_MAP_KEY(packer, name);
-  msgpack_pack_str_with_body(&packer, item->_name, strlen(item->_name));
+  serde_pack_str(&packer, "name");
+  serde_pack_str(&packer, item->_name);
 
-  WRITE_MAP_KEY(packer, weight);
+  serde_pack_str(&packer, "weight");
   msgpack_pack_uint32(&packer, item->_weight);
 
-  WRITE_MAP_KEY(packer, value);
+  serde_pack_str(&packer, "value");
   msgpack_pack_uint32(&packer, item->_value);
 
-  WRITE_MAP_KEY(packer, coords);
+  serde_pack_str(&packer, "coords");
   if (item_has_coords(item)) {
     msgpack_pack_array(&packer, 2);
     msgpack_pack_uint32(&packer, point_get_x(item->_coords));
@@ -87,7 +86,7 @@ void item_serialize(Item *item, msgpack_sbuffer *buffer) {
     msgpack_pack_array(&packer, 0);
   }
 
-  WRITE_MAP_KEY(packer, properties);
+  serde_pack_str(&packer, "properties");
   switch (item->_type) {
     case ARMOR:
       armor_serialize(item, &packer);
@@ -110,23 +109,6 @@ void item_serialize(Item *item, msgpack_sbuffer *buffer) {
   }
 }
 
-bool strnequal(const char *lhs, const char *rhs, size_t size) {
-  return strncmp(lhs, rhs, size) == 0;
-}
-
-msgpack_object_kv *find_key(msgpack_object_map *map, const char *key) {
-  msgpack_object_kv *return_value = nullptr;
-  for (uint32_t i = 0; i < map->size; i++) {
-    if (strnequal(map->ptr[i].key.via.str.ptr, key, map->ptr[i].key.via.str.size)) {
-      return_value = &map->ptr[i];
-    }
-  }
-
-  return return_value;
-}
-
-#define ASSERT_MAP_HEADER(pointer, val) assert(strnequal((pointer).key.via.str.ptr, val, (pointer).key.via.str.size));
-
 void item_deserialize_check_map(msgpack_object_map *msgpack_map) {
   LOG_INFO("Item map validation", 0);
 
@@ -137,70 +119,81 @@ void item_deserialize_check_map(msgpack_object_map *msgpack_map) {
     assert(msgpack_map->ptr[i].key.type == MSGPACK_OBJECT_STR);
   }
 
-  ASSERT_MAP_HEADER(msgpack_map->ptr[0], "type");
-  ASSERT_MAP_HEADER(msgpack_map->ptr[1], "name");
-  ASSERT_MAP_HEADER(msgpack_map->ptr[2], "weight");
-  ASSERT_MAP_HEADER(msgpack_map->ptr[3], "value");
-  ASSERT_MAP_HEADER(msgpack_map->ptr[4], "coords");
-  ASSERT_MAP_HEADER(msgpack_map->ptr[5], "properties");
+  serde_map_assert(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "type");
+  serde_map_assert(msgpack_map, MSGPACK_OBJECT_STR, "name");
+  serde_map_assert(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "weight");
+  serde_map_assert(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "value");
+  serde_map_assert(msgpack_map, MSGPACK_OBJECT_ARRAY, "coords");
+
+  bool has_properties = true;
+  if (serde_map_find(msgpack_map, MSGPACK_OBJECT_NIL, "properties") == nullptr) {
+    if (serde_map_find(msgpack_map, MSGPACK_OBJECT_MAP, "properties") == nullptr) {
+      has_properties = false;
+    }
+  }
+  assert(has_properties);
 }
 
-void armor_deserialize_check_map(msgpack_object_map *msgmap) {
+void armor_deserialize_check_map(msgpack_object_map const *msgmap) {
   LOG_INFO("Armor map validation", 0);
 
+  assert(msgmap != nullptr);
   assert(msgmap->size == 3);
-  ASSERT_MAP_HEADER(msgmap->ptr[0], "defense_value");
-  ASSERT_MAP_HEADER(msgmap->ptr[1], "armor_class");
-  ASSERT_MAP_HEADER(msgmap->ptr[2], "life_points");
+  serde_map_assert(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "defense_value");
+  serde_map_assert(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "armor_class");
+  serde_map_assert(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "life_points");
 }
 
-ArmorProperties *armor_deserialize(msgpack_object_map *msgmap) {
+ArmorProperties *armor_deserialize(msgpack_object_map const *msgmap) {
   LOG_INFO("Deserializing armor properties", 0);
   armor_deserialize_check_map(msgmap);
 
   ArmorProperties *props = calloc(1, sizeof(ArmorProperties));
-  props->_armor_class = find_key(msgmap, "armor_class")->val.via.u64;
-  props->_life_points = find_key(msgmap, "life_points")->val.via.u64;
-  props->_defense_value = find_key(msgmap, "defense_value")->val.via.u64;
+  props->_armor_class = *(uint8_t *)serde_map_get(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "armor_class");
+  props->_life_points = *(uint8_t *)serde_map_get(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "life_points");
+  props->_defense_value = *(uint32_t *)serde_map_get(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "defense_value");
 
   return props;
 }
 
-void tool_deserialize_check_map(msgpack_object_map *msgmap) {
+void tool_deserialize_check_map(msgpack_object_map const *msgmap) {
   LOG_INFO("Tool map validation", 0);
 
+  assert(msgmap != nullptr);
   assert(msgmap->size == 2);
-  ASSERT_MAP_HEADER(msgmap->ptr[0], "hands");
-  ASSERT_MAP_HEADER(msgmap->ptr[1], "life_points");
+  serde_map_assert(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "hands");
+  serde_map_assert(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "life_points");
 }
 
-ToolProperties *tool_deserialize(msgpack_object_map *msgmap) {
+ToolProperties *tool_deserialize(msgpack_object_map const *msgmap) {
   LOG_INFO("Deserializing tool properties", 0);
+  tool_deserialize_check_map(msgmap);
 
   ToolProperties *props = calloc(1, sizeof(ToolProperties));
-  props->_hands = find_key(msgmap, "hands")->val.via.u64;
-  props->_life_points = find_key(msgmap, "life_points")->val.via.u64;
+  props->_hands = *(uint32_t *)serde_map_get(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "hands");
+  props->_life_points = *(uint8_t *)serde_map_get(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "life_points");
 
   return props;
 }
 
-void weapon_deserialize_check_map(msgpack_object_map *msgmap) {
+void weapon_deserialize_check_map(msgpack_object_map const *msgmap) {
   LOG_INFO("Weapon map validation", 0);
 
+  assert(msgmap != nullptr);
   assert(msgmap->size == 3);
-  ASSERT_MAP_HEADER(msgmap->ptr[0], "attack_power");
-  ASSERT_MAP_HEADER(msgmap->ptr[1], "life_points");
-  ASSERT_MAP_HEADER(msgmap->ptr[2], "hands");
+  serde_map_assert(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "attack_power");
+  serde_map_assert(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "life_points");
+  serde_map_assert(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "hands");
 }
 
-WeaponProperties *weapon_deserialize(msgpack_object_map *msgmap) {
+WeaponProperties *weapon_deserialize(msgpack_object_map const *msgmap) {
   LOG_INFO("Deserializing weapon properties", 0);
   weapon_deserialize_check_map(msgmap);
 
   WeaponProperties *props = calloc(1, sizeof(ArmorProperties));
-  props->_attack_power = find_key(msgmap, "attack_power")->val.via.u64;
-  props->_life_points = find_key(msgmap, "life_points")->val.via.u64;
-  props->_hands = find_key(msgmap, "hands")->val.via.u64;
+  props->_attack_power = *(uint8_t *)serde_map_get(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "attack_power");
+  props->_life_points = *(uint8_t *)serde_map_get(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "life_points");
+  props->_hands = *(uint8_t *)serde_map_get(msgmap, MSGPACK_OBJECT_POSITIVE_INTEGER, "hands");
 
   return props;
 }
@@ -209,15 +202,19 @@ Item *item_deserialize(msgpack_object_map *msgpack_map) {
   LOG_INFO("Starting deserialization of item", 0);
   item_deserialize_check_map(msgpack_map);
 
-  ItemType item_type = (ItemType)find_key(msgpack_map, "type")->val.via.u64;
+  ItemType item_type = *(ItemType *)serde_map_get(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "type");
 
-  msgpack_object_kv *name_kv = find_key(msgpack_map, "name");
-  char              *name = malloc(name_kv->val.via.str.size);
-  memcpy(name, name_kv->val.via.str.ptr, name_kv->val.via.str.size);
+  msgpack_object_str const *name_kv = (msgpack_object_str *)serde_map_get(msgpack_map, MSGPACK_OBJECT_STR, "name");
 
-  Item *final_item = item_new(item_type, name, find_key(msgpack_map, "weight")->val.via.u64, find_key(msgpack_map, "value")->val.via.u64);
+  char *name = malloc(name_kv->size);
+  memcpy(name, name_kv->ptr, name_kv->size);
 
-  msgpack_object_map *props = &find_key(msgpack_map, "properties")->val.via.map;
+  uint32_t const *weight = (uint32_t *)serde_map_get(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "weight");
+  uint32_t const *value = (uint32_t *)serde_map_get(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "value");
+
+  Item *final_item = item_new(item_type, name, *weight, *value);
+
+  msgpack_object_map const *props = serde_map_get(msgpack_map, MSGPACK_OBJECT_MAP, "properties");
 
   // TODO: specialized deserializations here
   switch (item_type) {
@@ -246,13 +243,13 @@ void armor_serialize(Item *item, msgpack_packer *packer) {
   ArmorProperties *properties = (ArmorProperties *)item->_properties;
   msgpack_pack_map(packer, 3);
 
-  WRITE_MAP_KEY(*packer, defense_value);
+  serde_pack_str(packer, "defense_value");
   msgpack_pack_uint32(packer, properties->_defense_value);
 
-  WRITE_MAP_KEY(*packer, armor_class);
+  serde_pack_str(packer, "armor_class");
   msgpack_pack_uint8(packer, properties->_armor_class);
 
-  WRITE_MAP_KEY(*packer, life_points);
+  serde_pack_str(packer, "life_points");
   msgpack_pack_uint8(packer, properties->_life_points);
 }
 
@@ -262,10 +259,10 @@ void tool_serialize(Item *item, msgpack_packer *packer) {
   ToolProperties *properties = (ToolProperties *)item->_properties;
   msgpack_pack_map(packer, 2);
 
-  WRITE_MAP_KEY(*packer, hands);
+  serde_pack_str(packer, "hands");
   msgpack_pack_uint8(packer, properties->_hands);
 
-  WRITE_MAP_KEY(*packer, life_points);
+  serde_pack_str(packer, "life_points");
   msgpack_pack_uint8(packer, properties->_life_points);
 }
 
@@ -275,13 +272,13 @@ void weapon_serialize(Item *item, msgpack_packer *packer) {
   WeaponProperties *properties = (WeaponProperties *)item->_properties;
   msgpack_pack_map(packer, 3);
 
-  WRITE_MAP_KEY(*packer, attack_power);
+  serde_pack_str(packer, "attack_power");
   msgpack_pack_uint32(packer, properties->_attack_power);
 
-  WRITE_MAP_KEY(*packer, life_points);
+  serde_pack_str(packer, "life_points");
   msgpack_pack_uint8(packer, properties->_life_points);
 
-  WRITE_MAP_KEY(*packer, hands);
+  serde_pack_str(packer, "hands");
   msgpack_pack_uint8(packer, properties->_hands);
 }
 
@@ -310,8 +307,8 @@ Item *item_clone(Item *origin) {
     if (origin->_type == WEAPON) {
       LOG_DEBUG("Item is a weapon", 0);
       ret->_properties = calloc(1, sizeof(WeaponProperties));
-      WeaponProperties *origin_properties = (WeaponProperties *)origin->_properties;
-      WeaponProperties *target_properties = (WeaponProperties *)ret->_properties;
+      WeaponProperties const *origin_properties = (WeaponProperties *)origin->_properties;
+      WeaponProperties       *target_properties = (WeaponProperties *)ret->_properties;
 
       target_properties->_hands = origin_properties->_hands;
       target_properties->_life_points = origin_properties->_life_points;
@@ -319,16 +316,16 @@ Item *item_clone(Item *origin) {
     } else if (origin->_type == TOOL) {
       LOG_DEBUG("Item is a tool", 0);
       ret->_properties = calloc(1, sizeof(ToolProperties));
-      ToolProperties *origin_properties = (ToolProperties *)origin->_properties;
-      ToolProperties *target_properties = (ToolProperties *)ret->_properties;
+      ToolProperties const *origin_properties = (ToolProperties *)origin->_properties;
+      ToolProperties       *target_properties = (ToolProperties *)ret->_properties;
 
       target_properties->_life_points = origin_properties->_life_points;
       target_properties->_hands = origin_properties->_hands;
     } else if (origin->_type == ARMOR) {
       LOG_DEBUG("Item is an armor", 0);
       ret->_properties = calloc(1, sizeof(ArmorProperties));
-      ArmorProperties *origin_properties = (ArmorProperties *)origin->_properties;
-      ArmorProperties *target_properties = (ArmorProperties *)ret->_properties;
+      ArmorProperties const *origin_properties = (ArmorProperties *)origin->_properties;
+      ArmorProperties       *target_properties = (ArmorProperties *)ret->_properties;
 
       target_properties->_life_points = origin_properties->_life_points;
       target_properties->_armor_class = origin_properties->_armor_class;

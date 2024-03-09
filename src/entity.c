@@ -2,6 +2,7 @@
 #include "item.h"
 #include "logger.h"
 #include "point.h"
+#include "serde.h"
 #include "utils.h"
 #include <assert.h>
 #include <msgpack/object.h>
@@ -58,38 +59,44 @@ Entity *entity_new(uint32_t starting_lp, EntityType type, const char *name, uint
   return ret;
 }
 
-#define ASSERT_MAP_KEY(mapkey, val) assert(strncmp((mapkey).key.via.str.ptr, val, (mapkey).key.via.str.size) == 0)
-
 Entity *entity_deserialize(msgpack_object_map *map) {
   LOG_INFO("Unmarshalling entity", 0);
   LOG_INFO("Validating map", 0);
-  assert(map->size == 6);
-  ASSERT_MAP_KEY(map->ptr[0], "current_lp");
-  ASSERT_MAP_KEY(map->ptr[1], "starting_lp");
-  ASSERT_MAP_KEY(map->ptr[2], "type");
-  ASSERT_MAP_KEY(map->ptr[3], "name");
-  ASSERT_MAP_KEY(map->ptr[4], "coords");
-  ASSERT_MAP_KEY(map->ptr[5], "inventory");
 
-  uint32_t   current_lp = map->ptr[0].val.via.u64;
-  uint32_t   starting_lp = map->ptr[1].val.via.u64;
-  EntityType type = map->ptr[2].val.via.u64;
-  Point     *coords = point_new(map->ptr[4].val.via.array.ptr[0].via.u64, map->ptr[4].val.via.array.ptr[1].via.u64);
+  assert(map->size == 6);
+  serde_map_assert(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "current_lp");
+  serde_map_assert(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "starting_lp");
+  serde_map_assert(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "type");
+  serde_map_assert(map, MSGPACK_OBJECT_STR, "name");
+  serde_map_assert(map, MSGPACK_OBJECT_ARRAY, "coords");
+  serde_map_assert(map, MSGPACK_OBJECT_ARRAY, "inventory");
+
+  uint32_t   current_lp = *(uint32_t *)serde_map_get(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "current_lp");
+  uint32_t   starting_lp = *(uint32_t *)serde_map_get(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "starting_lp");
+  EntityType type = *(EntityType *)serde_map_get(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "type");
+
+  msgpack_object_array const *coords_array = serde_map_get(map, MSGPACK_OBJECT_ARRAY, "coords");
+  assert(coords_array->size == 2);
+
+  Point *coords = point_new(coords_array->ptr[0].via.u64, coords_array->ptr[1].via.u64);
 
   Entity *entity = calloc(1, sizeof(Entity));
   entity->_starting_lp = starting_lp;
   entity->_type = type;
   entity->_lp = current_lp;
   entity->_coords = coords;
-  entity->_name = calloc(map->ptr[3].val.via.str.size, sizeof(char));
-  memcpy(entity->_name, map->ptr[3].val.via.str.ptr, map->ptr[3].val.via.str.size);
 
-  uint32_t inventory_size = map->ptr[5].val.via.array.size;
+  msgpack_object_str const *name_ptr = serde_map_get(map, MSGPACK_OBJECT_STR, "name");
 
-  entity->_inventory = calloc(inventory_size + 1 /* for the null pointer */, sizeof(Item *));
-  entity->_inventory[inventory_size] = nullptr;
-  for (uint i = 0; i < inventory_size; i++) {
-    entity->_inventory[i] = item_deserialize(&(map->ptr[5].val.via.array.ptr[i].via.map));
+  entity->_name = calloc(name_ptr->size, sizeof(char));
+  memcpy(entity->_name, name_ptr->ptr, name_ptr->size);
+
+  msgpack_object_array const *inventory = serde_map_get(map, MSGPACK_OBJECT_ARRAY, "inventory");
+
+  entity->_inventory = calloc(inventory->size + 1 /* for the null pointer */, sizeof(Item *));
+  entity->_inventory[inventory->size] = nullptr;
+  for (uint i = 0; i < inventory->size; i++) {
+    entity->_inventory[i] = item_deserialize(&(inventory->ptr[i].via.map));
   }
 
   return entity;
@@ -141,68 +148,35 @@ Entity *entity_from_string(const char *input_string) {
   return ret;
 }
 
-typedef struct MapKey {
-  char  *str;
-  size_t len;
-} MapKey;
-
-MapKey *map_key_new(const char *input) {
-  MapKey *map_key = calloc(1, sizeof(MapKey));
-  map_key->str = strdup(input);
-  map_key->len = strlen(map_key->str);
-
-  return map_key;
-}
-
-void map_key_free(MapKey *map_key) {
-  free(map_key->str);
-  free(map_key);
-  map_key = nullptr;
-}
-
 void entity_serialize(Entity *ent, msgpack_sbuffer *buffer) {
-  MapKey *k_current_lp = map_key_new("current_lp");
-  MapKey *k_starting_lp = map_key_new("starting_lp");
-  MapKey *k_type = map_key_new("type");
-  MapKey *k_name = map_key_new("name");
-  MapKey *k_coords = map_key_new("coords");
-  MapKey *k_inventory = map_key_new("inventory");
-
   msgpack_packer packer;
   msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
 
   msgpack_pack_map(&packer, 6);
 
-  msgpack_pack_str_with_body(&packer, k_current_lp->str, k_current_lp->len);
+  serde_pack_str(&packer, "current_lp");
   msgpack_pack_uint64(&packer, ent->_lp);
 
-  msgpack_pack_str_with_body(&packer, k_starting_lp->str, k_starting_lp->len);
+  serde_pack_str(&packer, "starting_lp");
   msgpack_pack_uint64(&packer, ent->_starting_lp);
 
-  msgpack_pack_str_with_body(&packer, k_type->str, k_type->len);
+  serde_pack_str(&packer, "type");
   msgpack_pack_uint8(&packer, ent->_type);
 
-  msgpack_pack_str_with_body(&packer, k_name->str, k_name->len);
-  msgpack_pack_str_with_body(&packer, ent->_name, strlen(ent->_name));
+  serde_pack_str(&packer, "name");
+  serde_pack_str(&packer, ent->_name);
 
-  msgpack_pack_str_with_body(&packer, k_coords->str, k_coords->len);
+  serde_pack_str(&packer, "coords");
   msgpack_pack_array(&packer, 2);
   msgpack_pack_uint32(&packer, point_get_x(ent->_coords));
   msgpack_pack_uint32(&packer, point_get_y(ent->_coords));
 
-  msgpack_pack_str_with_body(&packer, k_inventory->str, k_inventory->len);
+  serde_pack_str(&packer, "inventory");
   uint32_t inventory_count = entity_inventory_count(ent);
   msgpack_pack_array(&packer, inventory_count);
   for (uint32_t i = 0; i < inventory_count; i++) {
     item_serialize(ent->_inventory[i], buffer);
   }
-
-  map_key_free(k_current_lp);
-  map_key_free(k_starting_lp);
-  map_key_free(k_type);
-  map_key_free(k_name);
-  map_key_free(k_coords);
-  map_key_free(k_inventory);
 }
 
 char entity_type_to_char(EntityType entity_type) {

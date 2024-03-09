@@ -2,6 +2,7 @@
 #include "entity.h"
 #include "logger.h"
 #include "map.h"
+#include "serde.h"
 #include <assert.h>
 #include <msgpack.h>
 #include <msgpack/object.h>
@@ -192,34 +193,31 @@ inline uint32_t engine_get_current_cycle(Engine *eng) {
   return eng->_current_cycle;
 }
 
-#define PACK_MAP_KEY(packer, key) msgpack_pack_str_with_body(&(packer), key, strlen(key))
-#define ASSERT_MAP_KEY(mk, k)     assert(strncmp((mk).key.via.str.ptr, k, strlen(k)) == 0)
-
 Engine *engine_deserialize(msgpack_object_map const *map) {
   assert(map->size == 3);
-  ASSERT_MAP_KEY(map->ptr[0], "active_entity");
-  ASSERT_MAP_KEY(map->ptr[1], "current_cycle");
-  ASSERT_MAP_KEY(map->ptr[2], "map_object");
+
+  assert(serde_map_find(map, MSGPACK_OBJECT_STR, "active_entity") != nullptr ||
+         serde_map_find(map, MSGPACK_OBJECT_NIL, "active_entity") != nullptr);
+  serde_map_assert(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "current_cycle");
+  serde_map_assert(map, MSGPACK_OBJECT_MAP, "map_object");
 
   Engine *engine = calloc(1, sizeof(Engine));
-  engine->_current_cycle = map->ptr[1].val.via.u64;
-  engine->_map = map_deserialize(&map->ptr[2].val.via.map);
+  engine->_current_cycle = *(uint32_t *)serde_map_get(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "current_cycle");
+  engine->_map = map_deserialize((msgpack_object_map *)serde_map_get(map, MSGPACK_OBJECT_MAP, "map_object"));
 
-  if (map->ptr[0].val.type == MSGPACK_OBJECT_STR) {
-    msgpack_object_str const *entity_object = &map->ptr[0].val.via.str;
+  msgpack_object_str const *active_entity = serde_map_get(map, MSGPACK_OBJECT_STR, "active_entity");
 
-    char entity_name[entity_object->size];
-    memcpy(entity_name, entity_object->ptr, entity_object->size);
+  if (active_entity != nullptr) {
+    char entity_name[active_entity->size];
+    memcpy(entity_name, active_entity->ptr, active_entity->size);
     engine->_active_entity = map_get_entity(engine->_map, entity_name);
-  } else {
-    engine->_active_entity = nullptr;
   }
 
   return engine;
 }
 
 void engine_serialize(Engine *eng, msgpack_sbuffer *buffer) {
-  LOG_DEBUG("Starting packer for engine 0x%p", eng);
+  LOG_DEBUG("Starting packer for engine", eng);
 
   msgpack_packer packer;
 
@@ -227,21 +225,20 @@ void engine_serialize(Engine *eng, msgpack_sbuffer *buffer) {
 
   // Root object is a map
   msgpack_pack_map(&packer, 3);
-  PACK_MAP_KEY(packer, "active_entity");
+  serde_pack_str(&packer, "active_entity");
 
   if (engine_has_active_entity(eng)) {
     LOG_DEBUG("Engine has active entity", 0);
-    const char *active_entity_name = entity_get_name(engine_get_active_entity(eng));
-    msgpack_pack_str_with_body(&packer, active_entity_name, strlen(active_entity_name));
+    serde_pack_str(&packer, entity_get_name(eng->_active_entity));
   } else {
     LOG_WARNING("No active entity found!", 0);
     msgpack_pack_nil(&packer);
   }
 
-  PACK_MAP_KEY(packer, "current_cycle");
+  serde_pack_str(&packer, "current_cycle");
   msgpack_pack_unsigned_int(&packer, eng->_current_cycle);
 
-  PACK_MAP_KEY(packer, "map_object");
+  serde_pack_str(&packer, "map_object");
   map_serialize(eng->_map, buffer);
 }
 
