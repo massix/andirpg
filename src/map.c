@@ -108,7 +108,7 @@ void map_remove_item(Map *map, const char *name) {
     return;
   }
 
-  size_t item_index = -1;
+  ssize_t item_index = -1;
 
   for (size_t i = 0; i < map->_items_size; i++) {
     if (strings_equal(item_get_name(map->_items[i]), name)) {
@@ -123,28 +123,6 @@ void map_remove_item(Map *map, const char *name) {
     map->_items_size--;
     map->_items = realloc(map->_items, map->_items_size * sizeof(Item *));
   }
-}
-
-Map *map_from_string(const char *input) {
-  uint32_t x_size;
-  uint32_t y_size;
-  uint32_t count;
-  uint32_t entities_size;
-  sscanf(input, "%d:%d:%d:%d", &x_size, &y_size, &count, &entities_size);
-
-  return map_new(x_size, y_size, entities_size);
-}
-
-void map_dump_to_file(Map *map, const char *path) {
-  FILE *output_file = fopen(path, "wb");
-
-  fprintf(output_file, "%d:%d:%d:%d\n", map->_x_size, map->_y_size, map->_last_index, map->_entities_size);
-
-  for (uint32_t i = 0; i < map->_last_index; i++) {
-    fprintf(output_file, "%s\n", entity_to_string(map->_entities[i]));
-  }
-
-  fclose(output_file);
 }
 
 Entity **map_get_all_entities(Map *map) {

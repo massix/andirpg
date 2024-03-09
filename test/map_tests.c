@@ -17,91 +17,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-void map_dump_test(void) {
-  Map *map = map_new(20, 50, 16);
-  map_add_entity(map, entity_new(20, TREE, "Just a tree", 15, 21));
-  map_add_entity(map, entity_new(15, HUMAN, "Just a human", 14, 21));
-  map_add_entity(map, entity_new(47, ANIMAL, "Just an animal", 14, 22));
-  map_add_entity(map, entity_new(22, MOUNTAIN, "Just a mountain", 13, 21));
-  map_add_entity(map, entity_new(22, MOUNTAIN, "Delete me", 10, 21));
-  map_add_entity(map, entity_new(21, TREE, "Another tree", 11, 21));
-  map_add_entity(map, entity_new(17, ANIMAL, "Another animal", 20, 24));
-
-  map_remove_entity(map, "Delete me");
-  entity_move(map_get_entity(map, "Another animal"), 3, -4);
-
-  const char *dump_file = "./test-dump-map";
-
-  map_dump_to_file(map, dump_file);
-
-  FILE *result = fopen(dump_file, "r");
-
-  // First line contains the raw values
-  size_t read_bytes;
-  char  *read_line = nullptr;
-  getline(&read_line, &read_bytes, result);
-  read_line[strcspn(read_line, "\n")] = '\0';
-  CU_ASSERT(read_bytes > 0);
-  CU_ASSERT_PTR_NOT_NULL(read_line);
-  CU_ASSERT_TRUE(strings_equal(read_line, "20:50:6:16"));
-
-  Map          *rebuilt = map_from_string(read_line);
-  MapBoundaries rebuilt_boundaries = map_get_boundaries(rebuilt);
-  CU_ASSERT_EQUAL(rebuilt_boundaries.x, 20);
-  CU_ASSERT_EQUAL(rebuilt_boundaries.y, 50);
-  free(read_line);
-
-  // Then, we have all the entities
-  char **all_entities = calloc(50, sizeof(char *));
-  for (size_t i = 0; i < 50; i++) {
-    all_entities[i] = calloc(1024, sizeof(char));
-  }
-
-  read_line = nullptr;
-  size_t entity_index = 0;
-  while (getline(&read_line, &read_bytes, result) != -1) {
-    char *target = all_entities[entity_index];
-    strncpy(target, read_line, read_bytes);
-    target[strcspn(target, "\n")] = '\0';
-
-    free(read_line);
-    read_line = nullptr;
-    entity_index++;
-  }
-
-  // Here I can rebuild the whole map!
-  for (size_t i = 0; i < 50; i++) {
-    if (strlen(all_entities[i])) {
-      Entity *ent = entity_from_string(all_entities[i]);
-      CU_ASSERT_PTR_NOT_NULL(ent);
-      map_add_entity(rebuilt, ent);
-    }
-
-    free(all_entities[i]);
-  }
-
-  free(all_entities);
-
-  // Time to check!
-  CU_ASSERT_EQUAL(map_count_entities(rebuilt), 6);
-  CU_ASSERT_TRUE(map_contains_entity(rebuilt, "Just a tree"));
-  CU_ASSERT_TRUE(map_contains_entity(rebuilt, "Just a human"));
-  CU_ASSERT_TRUE(map_contains_entity(rebuilt, "Just an animal"));
-  CU_ASSERT_TRUE(map_contains_entity(rebuilt, "Just a mountain"));
-  CU_ASSERT_TRUE(map_contains_entity(rebuilt, "Another tree"));
-  CU_ASSERT_TRUE(map_contains_entity(rebuilt, "Another animal"));
-  CU_ASSERT_FALSE(map_contains_entity(rebuilt, "Delete mw"));
-
-  Point *coords = entity_get_coords(map_get_entity(rebuilt, "Another animal"));
-  CU_ASSERT_EQUAL(point_get_x(coords), 23);
-  CU_ASSERT_EQUAL(point_get_y(coords), 20);
-
-  fclose(result);
-  unlink(dump_file);
-  map_free(map);
-  map_free(rebuilt);
-}
-
 void map_creation_test(void) {
   Map *map = map_new(20, 20, 15);
   CU_ASSERT_PTR_NOT_NULL(map);
@@ -354,7 +269,6 @@ void map_test_suite() {
   CU_add_test(suite, "Creation", &map_creation_test);
   CU_add_test(suite, "Handle Entities", &map_entities_test);
   CU_add_test(suite, "Handle Items", &map_items_test);
-  CU_add_test(suite, "Serialization", &map_dump_test);
   CU_add_test(suite, "Msgpack Serialization", &map_serialization_test);
   CU_add_test(suite, "Msgpack Deserialization", &map_deserialize_test);
 }

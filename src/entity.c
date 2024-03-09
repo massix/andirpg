@@ -123,52 +123,6 @@ Entity *entity_deserialize(msgpack_object_map *map) {
   return entity;
 }
 
-char *entity_to_string(Entity *entity) {
-  // Better safe than sorry I guess
-  char *ret = calloc(strlen(entity->_name) + 512, sizeof(char));
-  sprintf(ret, "%d:%c:%d:%d:%s", entity->_lp, entity_type_to_char(entity->_type), point_get_x(entity->_coords),
-          point_get_y(entity->_coords), entity->_name);
-  return ret;
-}
-
-Entity *entity_from_string(const char *input_string) {
-  uint32_t starting_lp;
-  char     type;
-  char    *name = calloc(512, sizeof(char));
-  uint32_t x;
-  uint32_t y;
-
-  LOG_INFO("Recreating entity from string: '%s'", input_string);
-
-  sscanf(input_string, "%d:%c:%d:%d:%[^\0]s", &starting_lp, &type, &x, &y, name);
-  EntityType final_type = HUMAN;
-  switch (type) {
-    case '@':
-      final_type = HUMAN;
-      break;
-    case '&':
-      final_type = INHUMAN;
-      break;
-    case '%':
-      final_type = TREE;
-      break;
-    case '^':
-      final_type = MOUNTAIN;
-      break;
-    case '#':
-      final_type = ANIMAL;
-      break;
-    default:
-      final_type = HUMAN;
-      break;
-  }
-
-  Entity *ret = entity_new(starting_lp, final_type, name, x, y);
-  free(name);
-
-  return ret;
-}
-
 void entity_serialize(Entity *ent, msgpack_sbuffer *buffer) {
   msgpack_packer packer;
   msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);

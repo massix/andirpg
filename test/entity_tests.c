@@ -122,23 +122,6 @@ void entity_move_test(void) {
   entity_free(mountain);
 }
 
-void entity_to_string_test(void) {
-  Entity *entity = entity_new(512, INHUMAN, "A vampire", 21, 42);
-  entity_move(entity, 21, -2);
-  char *str = entity_to_string(entity);
-
-  CU_ASSERT_TRUE(strings_equal(str, "512:&:42:40:A vampire"));
-
-  Entity *rebuilt = entity_from_string(str);
-  CU_ASSERT_EQUAL(entity_get_life_points(rebuilt), 512);
-  CU_ASSERT_EQUAL(*entity_get_entity_type(rebuilt), INHUMAN);
-  CU_ASSERT_TRUE(strings_equal(entity_get_name(rebuilt), "A vampire"));
-  CU_ASSERT_EQUAL(point_get_x(entity_get_coords(rebuilt)), 42);
-  CU_ASSERT_EQUAL(point_get_y(entity_get_coords(rebuilt)), 40);
-
-  free(str);
-}
-
 bool filter_weapons(Item *item) {
   return strncmp(item_get_name(item), "Weapon", 6) == 0;
 }
@@ -338,7 +321,6 @@ void entity_test_suite() {
   CU_add_test(suite, "Manipulate life points", &entity_lifepoints_test);
   CU_add_test(suite, "Move entities", &entity_move_test);
   CU_add_test(suite, "Resurrect entities", &entity_resurrect_test);
-  CU_add_test(suite, "To/From string", &entity_to_string_test);
   CU_add_test(suite, "Serialization", &entity_serialization_test);
   CU_add_test(suite, "Deserialization", &entity_deserialize_test);
   CU_add_test(suite, "Inventory manipulation", &entity_inventory_test);

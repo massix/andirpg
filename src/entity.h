@@ -40,8 +40,6 @@ char        entity_type_to_char(EntityType);
 Entity *entity_new(uint32_t starting_lp, EntityType type, const char *name, uint32_t start_x, uint32_t start_y);
 Entity *entity_deserialize(msgpack_object_map *);
 
-Entity  *entity_from_string(const char *);
-char    *entity_to_string(Entity *);
 bool     entity_can_move(Entity *);
 void     entity_move(Entity *, uint32_t delta_x, uint32_t delta_y);
 void     entity_hurt(Entity *, uint32_t life_points);
