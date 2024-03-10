@@ -39,6 +39,7 @@ typedef struct MapBoundaries {
 } MapBoundaries;
 
 typedef struct TileProperties {
+  TileKind kind;
   uint32_t base_light;
   bool     inside;
   bool     traversable;

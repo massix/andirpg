@@ -184,3 +184,7 @@ inline void tile_set_traversable(Tile *tile, bool traversable) {
   tile->_traversable = traversable;
 }
 
+inline void tile_set_kind(Tile *tile, TileKind kind) {
+  tile->_tile_kind = kind;
+}
+

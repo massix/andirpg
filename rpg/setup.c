@@ -1,6 +1,7 @@
 #include "configuration.h"
 #include "entity.h"
 #include "map.h"
+#include "tile.h"
 #include <assert.h>
 #include <engine.h>
 #include <ncurses.h>
@@ -77,6 +78,7 @@ Engine *init_game(Configuration *configuration) {
   engine_set_active_entity(engine, configuration_get_player_name(configuration));
 
   TileProperties props;
+  props.kind = FLOOR;
   props.inside = true;
   props.traversable = true;
   props.base_light = 0;

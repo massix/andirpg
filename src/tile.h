@@ -56,6 +56,7 @@ uint32_t     tile_count_items(Tile const *);
 void tile_set_base_light(Tile *, uint32_t);
 void tile_set_inside(Tile *, bool);
 void tile_set_traversable(Tile *, bool);
+void tile_set_kind(Tile *, TileKind);
 
 #endif /* ifndef __TILE__H__ */
 

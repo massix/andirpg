@@ -142,6 +142,7 @@ Map *create_serde_map() {
 
   // Set a bunch of tiles as inside and unlit
   TileProperties props;
+  props.kind = TALL_GRASS;
   props.traversable = true;
   props.inside = true;
   props.base_light = 1;
@@ -276,6 +277,7 @@ void map_deserialize_test(void) {
   // A bunch of tiles inside
   CU_ASSERT_TRUE(tile_is_inside(map_get_tile(deserialized, 11, 2)));
   CU_ASSERT_TRUE(tile_is_inside(map_get_tile(deserialized, 12, 4)));
+  CU_ASSERT_EQUAL(tile_get_tile_kind(map_get_tile(deserialized, 11, 3)), TALL_GRASS);
 
   // All the rest of the tiles should be outside
   CU_ASSERT_FALSE(tile_is_inside(map_get_tile(deserialized, 0, 0)));
@@ -311,6 +313,7 @@ void map_tile_test(void) {
 
   // Tiles modification
   TileProperties props;
+  props.kind = GRASS;
   props.base_light = 1;
   props.inside = false;
   props.traversable = true;

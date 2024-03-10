@@ -377,6 +377,8 @@ void map_serialize(Map *map, msgpack_sbuffer *buffer) {
   }
 }
 
+// Internal method, we're allowed to modify a tile only by passing by
+// the exposed map's APIs
 Tile *map_modify_tile(Map const *map, uint32_t x, uint32_t y) {
   if (x >= map->_x_size || y >= map->_y_size) {
     return nullptr;
@@ -395,6 +397,7 @@ inline void map_set_tile_properties(Map const *map, uint32_t x, uint32_t y, Tile
     tile_set_base_light(tile_at, tile_props->base_light);
     tile_set_inside(tile_at, tile_props->inside);
     tile_set_traversable(tile_at, tile_props->traversable);
+    tile_set_kind(tile_at, tile_props->kind);
   }
 }
 
