@@ -29,7 +29,7 @@
 #include <string.h>
 
 void tile_constructor_test(void) {
-  Tile *tile = tile_new(10, 20);
+  Tile *tile = tile_new(GRASS, 10, 20);
   tile_set_traversable(tile, false);
   tile_set_base_light(tile, 8);
 
@@ -45,7 +45,7 @@ void tile_constructor_test(void) {
 }
 
 void tile_serialize_test(void) {
-  Tile *tile = tile_new(10, 20);
+  Tile *tile = tile_new(GRAVIER, 10, 20);
   tile_set_base_light(tile, 3);
 
   msgpack_sbuffer sbuffer;

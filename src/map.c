@@ -66,7 +66,7 @@ Map *map_new(uint32_t x_size, uint32_t y_size, uint32_t max_entities, char const
   uint32_t current_index = 0;
   for (uint32_t x = 0; x < x_size; x++) {
     for (uint32_t y = 0; y < y_size; y++) {
-      ret->_tiles[current_index] = tile_new(x, y);
+      ret->_tiles[current_index] = tile_new(GRASS, x, y);
       current_index++;
     }
   }

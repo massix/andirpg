@@ -29,10 +29,16 @@
 #include <sys/types.h>
 
 typedef struct Tile Tile;
-typedef enum TileKind { GRASS, TALL_GRASS, ROAD, GRAVIER, FLOOR } TileKind;
+typedef enum TileKind {
+  GRASS = '.',
+  TALL_GRASS = ',',
+  ROAD = '#',
+  GRAVIER = '*',
+  FLOOR = ' ',
+} TileKind;
 
 // Constructors and destructors
-Tile *tile_new(uint32_t x, uint32_t y);
+Tile *tile_new(TileKind, uint32_t x, uint32_t y);
 Tile *tile_deserialize(msgpack_object_map const *);
 void  tile_serialize(Tile const *, msgpack_sbuffer *);
 void  tile_free(Tile *tile);

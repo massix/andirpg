@@ -40,10 +40,10 @@ typedef struct Tile {
   Point   *_coords;
 } Tile;
 
-Tile *tile_new(uint32_t x, uint32_t y) {
+Tile *tile_new(TileKind kind, uint32_t x, uint32_t y) {
   Tile *tile = calloc(1, sizeof(Tile));
 
-  tile->_tile_kind = GRASS;
+  tile->_tile_kind = kind;
   tile->_base_noise = 3;
   tile->_base_light = 10;
   tile->_inside = false;
