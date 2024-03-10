@@ -25,6 +25,7 @@
 #include "logger.h"
 #include "point.h"
 #include "serde.h"
+#include "tile.h"
 #include "utils.h"
 #include <assert.h>
 #include <msgpack/object.h>
@@ -32,8 +33,8 @@
 #include <msgpack/sbuffer.h>
 #include <msgpack/unpack.h>
 #include <ncurses.h>
+#include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -47,6 +48,7 @@ struct Map {
   char    *_name;
   Entity **_entities;
   Item   **_items;
+  Tile   **_tiles;
 };
 
 Map *map_new(uint32_t x_size, uint32_t y_size, uint32_t max_entities, char const *name) {
@@ -56,6 +58,18 @@ Map *map_new(uint32_t x_size, uint32_t y_size, uint32_t max_entities, char const
   ret->_last_index = 0;
   ret->_entities_size = max_entities;
   ret->_name = strdup(name);
+
+  unsigned long tiles_size = (unsigned long)x_size * y_size;
+
+  // Create the tiles array, store all the xs then all the ys
+  ret->_tiles = calloc(tiles_size, sizeof(Tile **));
+  uint32_t current_index = 0;
+  for (uint32_t x = 0; x < x_size; x++) {
+    for (uint32_t y = 0; y < y_size; y++) {
+      ret->_tiles[current_index] = tile_new(x, y);
+      current_index++;
+    }
+  }
 
   ret->_entities = calloc(max_entities, sizeof(Entity *));
   for (uint32_t i = 0; i < max_entities; i++) {
@@ -268,10 +282,9 @@ MapBoundaries map_get_boundaries(Map *map) {
 
 Map *map_deserialize(msgpack_object_map *msgpack_map) {
   LOG_INFO("Unmarshalling map", 0);
-  Map *map = calloc(1, sizeof(Map));
 
   // Check the validity of the map before starting the Unmarshalling process
-  assert(msgpack_map->size == 7);
+  assert(msgpack_map->size == 8);
   serde_map_assert(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "x_size");
   serde_map_assert(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "y_size");
   serde_map_assert(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "max_entities");
@@ -279,10 +292,14 @@ Map *map_deserialize(msgpack_object_map *msgpack_map) {
   serde_map_assert(msgpack_map, MSGPACK_OBJECT_STR, "name");
   serde_map_assert(msgpack_map, MSGPACK_OBJECT_ARRAY, "entities");
   serde_map_assert(msgpack_map, MSGPACK_OBJECT_ARRAY, "items");
+  serde_map_assert(msgpack_map, MSGPACK_OBJECT_ARRAY, "tiles");
 
   msgpack_object_array const *items = serde_map_get(msgpack_map, MSGPACK_OBJECT_ARRAY, "items");
   msgpack_object_array const *entities = serde_map_get(msgpack_map, MSGPACK_OBJECT_ARRAY, "entities");
+  msgpack_object_array const *tiles = serde_map_get(msgpack_map, MSGPACK_OBJECT_ARRAY, "tiles");
   msgpack_object_str const   *name = serde_map_get(msgpack_map, MSGPACK_OBJECT_STR, "name");
+
+  Map *map = calloc(1, sizeof(Map));
 
   map->_x_size = *(uint32_t *)serde_map_get(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "x_size");
   map->_y_size = *(uint32_t *)serde_map_get(msgpack_map, MSGPACK_OBJECT_POSITIVE_INTEGER, "y_size");
@@ -310,6 +327,11 @@ Map *map_deserialize(msgpack_object_map *msgpack_map) {
     map->_items[i] = item_deserialize(&item_map);
   }
 
+  map->_tiles = calloc(tiles->size, sizeof(Tile *));
+  for (uint i = 0; i < tiles->size; i++) {
+    map->_tiles[i] = tile_deserialize(&tiles->ptr[i].via.map);
+  }
+
   return map;
 }
 
@@ -318,7 +340,7 @@ void map_serialize(Map *map, msgpack_sbuffer *buffer) {
   msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
 
   // Map is a dictionary
-  msgpack_pack_map(&packer, 7);
+  msgpack_pack_map(&packer, 8);
 
   serde_pack_str(&packer, "x_size");
   msgpack_pack_uint32(&packer, map->_x_size);
@@ -346,6 +368,21 @@ void map_serialize(Map *map, msgpack_sbuffer *buffer) {
   for (uint32_t i = 0; i < map_count_items(map); i++) {
     item_serialize(map->_items[i], buffer);
   }
+
+  serde_pack_str(&packer, "tiles");
+  unsigned long total_tiles = (unsigned long)map->_x_size * map->_y_size;
+  msgpack_pack_array(&packer, total_tiles);
+  for (uint32_t i = 0; i < total_tiles; i++) {
+    tile_serialize(map->_tiles[i], buffer);
+  }
+}
+
+inline Tile const *map_get_tile(Map const *map, uint32_t x, uint32_t y) {
+  if (x >= map->_x_size || y >= map->_y_size) {
+    return nullptr;
+  }
+
+  return map->_tiles[y + ((unsigned long)x * map->_y_size)];
 }
 
 void map_free(Map *map) {
@@ -360,6 +397,11 @@ void map_free(Map *map) {
     free(map->_items);
   }
 
+  for (uint32_t i = 0; i < (unsigned long)map->_x_size * map->_y_size; i++) {
+    tile_free(map->_tiles[i]);
+  }
+
+  free(map->_tiles);
   free(map->_entities);
   free(map->_name);
   free(map);

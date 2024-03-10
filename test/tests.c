@@ -14,6 +14,7 @@ void engine_test_suite();
 void configuration_test_suite();
 void item_test_suite();
 void logger_test_suite();
+void tile_test_suite();
 
 int main(int argc, char *argv[]) {
   logger_new("./tests.log", DEBUG);
@@ -29,6 +30,7 @@ int main(int argc, char *argv[]) {
   configuration_test_suite();
   item_test_suite();
   logger_test_suite();
+  tile_test_suite();
 
   CU_basic_set_mode(CU_BRM_VERBOSE);
   CU_ErrorCode code = CU_basic_run_tests();

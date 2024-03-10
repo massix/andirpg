@@ -24,6 +24,7 @@
 
 #include "entity.h"
 #include "item.h"
+#include "tile.h"
 #include <msgpack/object.h>
 #include <msgpack/sbuffer.h>
 #include <ncurses.h>
@@ -57,6 +58,7 @@ int           map_count_entities(Map *);
 MapBoundaries map_get_boundaries(Map *);
 bool          map_is_tile_free(Map *, uint32_t x, uint32_t y);
 void          map_serialize(Map *, msgpack_sbuffer *);
+Tile const   *map_get_tile(Map const *, uint32_t x, uint32_t y);
 
 // Destructor
 void map_free(Map *);

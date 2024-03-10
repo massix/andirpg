@@ -2,6 +2,7 @@
 #include "map.h"
 #include "point.h"
 #include "serde.h"
+#include "tile.h"
 #include "utils.h"
 #include <CUnit/CUnit.h>
 #include <CUnit/TestDB.h>
@@ -185,7 +186,7 @@ void map_serialization_test() {
 
   CU_ASSERT_EQUAL(msgpack_unpacker_next(&unpacker, &result), MSGPACK_UNPACK_SUCCESS);
   CU_ASSERT_EQUAL(result.data.type, MSGPACK_OBJECT_MAP);
-  CU_ASSERT_EQUAL(result.data.via.map.size, 7);
+  CU_ASSERT_EQUAL(result.data.via.map.size, 8);
 
   msgpack_object_map *msgmap = &result.data.via.map;
 
@@ -213,6 +214,9 @@ void map_serialization_test() {
   // tested elsewhere.
   serde_map_assert(msgmap, MSGPACK_OBJECT_ARRAY, "items");
   CU_ASSERT_EQUAL(((msgpack_object_array *)serde_map_get(msgmap, MSGPACK_OBJECT_ARRAY, "items"))->size, 4);
+
+  serde_map_assert(msgmap, MSGPACK_OBJECT_ARRAY, "tiles");
+  CU_ASSERT_EQUAL(((msgpack_object_array *)serde_map_get(msgmap, MSGPACK_OBJECT_ARRAY, "tiles"))->size, 42 * 23);
 
   free(buffer);
   msgpack_sbuffer_destroy(&sbuffer);
@@ -263,12 +267,39 @@ void map_deserialize_test(void) {
   map_free(map);
 }
 
+#define MAP_ASSERT_TILE(map, x, y)                                 \
+  {                                                                \
+    Tile const *tile = map_get_tile(map, x, y);                    \
+    CU_ASSERT_PTR_NOT_NULL(tile);                                  \
+    CU_ASSERT_TRUE(point_has_coords(tile_get_coords(tile), x, y)); \
+  }
+
+void map_tile_test(void) {
+  Map *map = map_new(19, 16, 20, "TilesTest");
+
+  MAP_ASSERT_TILE(map, 0, 0);
+  MAP_ASSERT_TILE(map, 0, 15);
+  MAP_ASSERT_TILE(map, 1, 0);
+  MAP_ASSERT_TILE(map, 3, 2);
+  MAP_ASSERT_TILE(map, 14, 12);
+  MAP_ASSERT_TILE(map, 6, 0);
+
+  // Out of range test
+  CU_ASSERT_PTR_NULL(map_get_tile(map, 19, 16));
+  CU_ASSERT_PTR_NULL(map_get_tile(map, 0, 16));
+  CU_ASSERT_PTR_NULL(map_get_tile(map, 19, 0));
+  CU_ASSERT_PTR_NULL(map_get_tile(map, 26, 65));
+
+  map_free(map);
+}
+
 void map_test_suite() {
   CU_pSuite suite = CU_add_suite("Map Tests", nullptr, nullptr);
   CU_add_test(suite, "Creation", &map_creation_test);
   CU_add_test(suite, "Handle Entities", &map_entities_test);
   CU_add_test(suite, "Handle Items", &map_items_test);
-  CU_add_test(suite, "Msgpack Serialization", &map_serialization_test);
-  CU_add_test(suite, "Msgpack Deserialization", &map_deserialize_test);
+  CU_add_test(suite, "Serialization", &map_serialization_test);
+  CU_add_test(suite, "Deserialization", &map_deserialize_test);
+  CU_add_test(suite, "Tiles", &map_tile_test);
 }
 

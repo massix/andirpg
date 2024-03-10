@@ -19,46 +19,37 @@
 // TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+#ifndef __TILE__H__
+#define __TILE__H__
+
 #include "point.h"
+#include <msgpack/object.h>
+#include <msgpack/sbuffer.h>
 #include <stdint.h>
-#include <stdlib.h>
+#include <sys/types.h>
 
-struct Point {
-  uint32_t _x;
-  uint32_t _y;
-};
+typedef struct Tile Tile;
+typedef enum TileKind { GRASS, TALL_GRASS, ROAD, GRAVIER, FLOOR } TileKind;
 
-Point *point_new(uint32_t x, uint32_t y) {
-  Point *ret = calloc(1, sizeof(Point));
-  ret->_x = x;
-  ret->_y = y;
-  return ret;
-}
+// Constructors and destructors
+Tile *tile_new(uint32_t x, uint32_t y);
+Tile *tile_deserialize(msgpack_object_map const *);
+void  tile_serialize(Tile const *, msgpack_sbuffer *);
+void  tile_free(Tile *tile);
 
-inline uint32_t point_get_x(Point const *point) {
-  return point->_x;
-}
+// Getters
+TileKind     tile_get_tile_kind(Tile const *);
+bool         tile_is_inside(Tile const *);
+bool         tile_is_traversable(Tile const *);
+uint32_t     tile_get_base_noise(Tile const *);
+uint32_t     tile_get_base_light(Tile const *);
+Point const *tile_get_coords(Tile const *);
+uint32_t     tile_count_items(Tile const *);
 
-inline uint32_t point_get_y(Point const *point) {
-  return point->_y;
-}
+// Setters
+void tile_set_base_light(Tile *, uint32_t);
+void tile_set_inside(Tile *, bool);
+void tile_set_traversable(Tile *, bool);
 
-inline void point_set_x(Point *point, uint32_t x) {
-  point->_x = x;
-}
+#endif /* ifndef __TILE__H__ */
 
-inline void point_set_y(Point *point, uint32_t y) {
-  point->_y = y;
-}
-
-inline bool points_equal(Point const *lhs, Point const *rhs) {
-  return lhs->_x == rhs->_x && rhs->_y && lhs->_y;
-}
-
-inline bool point_has_coords(Point const *point, uint32_t x, uint32_t y) {
-  return point->_x == x && point->_y == y;
-}
-
-void point_free(Point *point) {
-  free(point);
-}
