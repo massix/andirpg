@@ -1,26 +1,24 @@
 ---
-BasedOnStyle:  LLVM
+BasedOnStyle: LLVM
 IndentWidth: 2
 AlignConsecutiveAssignments:
-  Enabled:         false
+  Enabled: false
 AlignConsecutiveBitFields:
-  Enabled:         true
+  Enabled: true
 AlignConsecutiveDeclarations:
-  Enabled:         true
+  Enabled: true
 AlignConsecutiveMacros:
-  Enabled:         true
+  Enabled: true
 AlignConsecutiveShortCaseStatements:
-  Enabled:         true
+  Enabled: true
 AlignEscapedNewlines: Left
 AllowShortFunctionsOnASingleLine: None
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLambdasOnASingleLine: None
-ColumnLimit:     140
+ColumnLimit: 140
 ContinuationIndentWidth: 2
 IndentCaseBlocks: true
 IndentCaseLabels: true
 KeepEmptyLinesAtEOF: true
-ReflowComments:  true
-UseTab:          Never
-...
-
+ReflowComments: true
+UseTab: Never

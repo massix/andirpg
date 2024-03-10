@@ -4,6 +4,7 @@
 #include "logger.h"
 #include "map.h"
 #include "point.h"
+#include "tile.h"
 #include "ui_point.h"
 #include <ncurses.h>
 #include <stdint.h>
@@ -59,10 +60,10 @@ char **map_window_generate_matrix(MapWindow *mpw) {
     matrix[i] = calloc(boundaries.y, sizeof(char));
   }
 
-  // Fill the matrix with dots
+  // Fill the matrix with characters depending on the tile type
   for (int x = 0; x < boundaries.x; x++) {
     for (int y = 0; y < boundaries.y; y++) {
-      matrix[x][y] = '.';
+      matrix[x][y] = tile_get_tile_kind(map_get_tile(mpw->_map, x, y));
     }
   }
 

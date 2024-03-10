@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <engine.h>
 #include <ncurses.h>
+#include <stdint.h>
 
 Configuration *init_configuration() {
   Configuration *ret = configuration_new("./andirpg.ini");
@@ -74,6 +75,19 @@ Engine *init_game(Configuration *configuration) {
   engine_add_entity(engine, entity_new(30, ANIMAL, "a1", 6, 7));
 
   engine_set_active_entity(engine, configuration_get_player_name(configuration));
+
+  TileProperties props;
+  props.inside = true;
+  props.traversable = true;
+  props.base_light = 0;
+
+  // Set some tiles as unlit just for debug purposes
+  for (uint32_t x = 6; x < 8; x++) {
+    for (uint32_t y = 1; y < 5; y++) {
+      props.base_light = props.base_light + 1 % 10;
+      map_set_tile_properties(engine_get_map(engine), x, y, &props);
+    }
+  }
 
   return engine;
 }

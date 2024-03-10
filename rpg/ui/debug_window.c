@@ -24,6 +24,8 @@
 #include "engine.h"
 #include "entity.h"
 #include "map.h"
+#include "point.h"
+#include "tile.h"
 #include <ncurses.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -68,12 +70,21 @@ void debug_window_draw(DebugWindow *dbg) {
     Entity **movable_entities = map_filter_entities(engine_get_map(dbg->_engine), &entity_can_move, &s_movable_entities);
     free(movable_entities);
 
+    Point const *current_coords = entity_get_coords(engine_get_active_entity(dbg->_engine));
+    Tile const  *current_tile = map_get_tile(engine_get_map(dbg->_engine), point_get_x(current_coords), point_get_y(current_coords));
+
     wclear(target);
     wmove(target, 0, 0);
     wprintw(target, "Current cycle: %d\n", engine_get_current_cycle(dbg->_engine));
     wprintw(target, "Entities: %d\n", map_count_entities(engine_get_map(dbg->_engine)));
     wprintw(target, "Can move: %zd\n", s_movable_entities);
     wprintw(target, "Items: %d\n", map_count_items(engine_get_map(dbg->_engine)));
+    wprintw(target, "Coords: %d, %d\n", point_get_x(current_coords), point_get_y(current_coords));
+    wprintw(target, "Tile - Kind  : %c\n", tile_get_tile_kind(current_tile));
+    wprintw(target, "Tile - Light : %d\n", tile_get_base_light(current_tile));
+    wprintw(target, "Tile - Noise : %d\n", tile_get_base_noise(current_tile));
+    wprintw(target, "Tile - Inside: %s\n", tile_is_inside(current_tile) ? "yes" : "no");
+    wprintw(target, "Tile - Traver: %s\n", tile_is_traversable(current_tile) ? "yes" : "no");
     wnoutrefresh(target);
   }
 }
