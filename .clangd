@@ -4,9 +4,18 @@ InlayHints:
 
 Diagnostics:
   ClangTidy:
-    Add: [ modernize*, readability-identifier*, performance*, bugprone*, portability*, llvm-* ]
+    Add:
+      [
+        modernize*,
+        readability-identifier*,
+        performance*,
+        bugprone*,
+        portability*,
+        llvm-*,
+      ]
+    Remove: [bugprone-easily-swappable-parameters]
     CheckOptions:
-      portability-restrict-system-includes.Includes: '*'
+      portability-restrict-system-includes.Includes: "*"
       readability-identifier-naming.AggressiveDependentMemberLookup: true
       readability-identifier-naming.VariableCase: lower_case
       readability-identifier-naming.FunctionCase: lower_case
