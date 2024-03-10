@@ -377,12 +377,25 @@ void map_serialize(Map *map, msgpack_sbuffer *buffer) {
   }
 }
 
-inline Tile const *map_get_tile(Map const *map, uint32_t x, uint32_t y) {
+Tile *map_modify_tile(Map const *map, uint32_t x, uint32_t y) {
   if (x >= map->_x_size || y >= map->_y_size) {
     return nullptr;
   }
 
   return map->_tiles[y + ((unsigned long)x * map->_y_size)];
+}
+
+inline Tile const *map_get_tile(Map const *map, uint32_t x, uint32_t y) {
+  return (Tile const *)map_modify_tile(map, x, y);
+}
+
+inline void map_set_tile_properties(Map const *map, uint32_t x, uint32_t y, TileProperties const *tile_props) {
+  Tile *tile_at = map_modify_tile(map, x, y);
+  if (tile_at != nullptr) {
+    tile_set_base_light(tile_at, tile_props->base_light);
+    tile_set_inside(tile_at, tile_props->inside);
+    tile_set_traversable(tile_at, tile_props->traversable);
+  }
 }
 
 void map_free(Map *map) {

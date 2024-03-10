@@ -32,10 +32,17 @@
 #include <sys/types.h>
 
 typedef struct Map Map;
+
 typedef struct MapBoundaries {
   uint32_t x;
   uint32_t y;
 } MapBoundaries;
+
+typedef struct TileProperties {
+  uint32_t base_light;
+  bool     inside;
+  bool     traversable;
+} TileProperties;
 
 // Constructors
 Map *map_new(uint32_t x_size, uint32_t y_size, uint32_t max_entities, char const *);
@@ -59,6 +66,7 @@ MapBoundaries map_get_boundaries(Map *);
 bool          map_is_tile_free(Map *, uint32_t x, uint32_t y);
 void          map_serialize(Map *, msgpack_sbuffer *);
 Tile const   *map_get_tile(Map const *, uint32_t x, uint32_t y);
+void          map_set_tile_properties(Map const *, uint32_t x, uint32_t y, TileProperties const *);
 
 // Destructor
 void map_free(Map *);

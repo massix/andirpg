@@ -140,6 +140,18 @@ Map *create_serde_map() {
   map_add_item(map, armor_new("A blue-jeans", 30, 15, 16, 3, 3), 10, 1);
   map_add_item(map, armor_new("A hat", 30, 15, 16, 3, 3), 10, 1);
 
+  // Set a bunch of tiles as inside and unlit
+  TileProperties props;
+  props.traversable = true;
+  props.inside = true;
+  props.base_light = 1;
+
+  for (uint x = 10; x < 15; x++) {
+    for (uint y = 1; y < 6; y++) {
+      map_set_tile_properties(map, x, y, &props);
+    }
+  }
+
   return map;
 }
 
@@ -261,6 +273,13 @@ void map_deserialize_test(void) {
 
   CU_ASSERT_TRUE(strings_equal(map_get_name(map), map_get_name(deserialized)));
 
+  // A bunch of tiles inside
+  CU_ASSERT_TRUE(tile_is_inside(map_get_tile(deserialized, 11, 2)));
+  CU_ASSERT_TRUE(tile_is_inside(map_get_tile(deserialized, 12, 4)));
+
+  // All the rest of the tiles should be outside
+  CU_ASSERT_FALSE(tile_is_inside(map_get_tile(deserialized, 0, 0)));
+
   msgpack_unpacked_destroy(&result);
   msgpack_unpacker_destroy(&unpacker);
   map_free(deserialized);
@@ -289,6 +308,18 @@ void map_tile_test(void) {
   CU_ASSERT_PTR_NULL(map_get_tile(map, 0, 16));
   CU_ASSERT_PTR_NULL(map_get_tile(map, 19, 0));
   CU_ASSERT_PTR_NULL(map_get_tile(map, 26, 65));
+
+  // Tiles modification
+  TileProperties props;
+  props.base_light = 1;
+  props.inside = false;
+  props.traversable = true;
+
+  map_set_tile_properties(map, 1, 2, &props);
+  Tile const *modified = map_get_tile(map, 1, 2);
+  CU_ASSERT_EQUAL(tile_get_base_light(modified), 1);
+  CU_ASSERT_TRUE(tile_is_traversable(modified));
+  CU_ASSERT_FALSE(tile_is_inside(modified));
 
   map_free(map);
 }
