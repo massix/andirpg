@@ -410,7 +410,7 @@ inline ItemType item_get_type(Item *item) {
   return item->_type;
 }
 
-inline const char *item_get_name(Item *item) {
+inline const char *item_get_name(Item const *item) {
   return item->_name;
 }
 

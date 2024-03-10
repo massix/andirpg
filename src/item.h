@@ -48,7 +48,7 @@ Item *item_deserialize(msgpack_object_map *);
 
 bool        item_has_properties(Item *);
 void       *item_get_properties(Item *);
-const char *item_get_name(Item *);
+const char *item_get_name(Item const *);
 uint32_t    item_get_weight(Item *);
 uint32_t    item_get_value(Item *);
 ItemType    item_get_type(Item *);

@@ -19,8 +19,10 @@
 // TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+#include "item.h"
 #include "point.h"
 #include "tile.h"
+#include "utils.h"
 #include <CUnit/CUnit.h>
 #include <CUnit/TestDB.h>
 #include <msgpack/object.h>
@@ -47,6 +49,7 @@ void tile_constructor_test(void) {
 void tile_serialize_test(void) {
   Tile *tile = tile_new(GRAVIER, 10, 20);
   tile_set_base_light(tile, 3);
+  tile_add_item(tile, armor_new("Some Armor", 10, 0, 3, 10, 4));
 
   msgpack_sbuffer sbuffer;
   msgpack_sbuffer_init(&sbuffer);
@@ -73,6 +76,7 @@ void tile_serialize_test(void) {
   CU_ASSERT_EQUAL(tile_get_base_light(rebuilt), tile_get_base_light(tile));
   CU_ASSERT_EQUAL(tile_is_inside(rebuilt), tile_is_inside(tile));
   CU_ASSERT_EQUAL(tile_is_traversable(rebuilt), tile_is_traversable(tile));
+  CU_ASSERT_EQUAL(tile_count_items(rebuilt), tile_count_items(tile));
 
   msgpack_unpacked_destroy(&result);
   msgpack_unpacker_destroy(&unpacker);
@@ -81,8 +85,45 @@ void tile_serialize_test(void) {
   tile_free(tile);
 }
 
+void tile_items_test(void) {
+  Tile *tile = tile_new(TALL_GRASS, 0, 0);
+  CU_ASSERT_EQUAL(tile_count_items(tile), 0);
+
+  tile_add_item(tile, tool_new("Pickaxe", 10, 3, 2, 15));
+  CU_ASSERT_EQUAL(tile_count_items(tile), 1);
+  CU_ASSERT_TRUE(strings_equal(item_get_name(tile_get_item_at(tile, 0)), "Pickaxe"));
+
+  tile_add_item(tile, weapon_new("A gun", 10, 30, 1, 50, 10));
+  CU_ASSERT_EQUAL(tile_count_items(tile), 2);
+  CU_ASSERT_TRUE(strings_equal(item_get_name(tile_get_item_at(tile, 1)), "A gun"));
+
+  tile_add_item(tile, armor_new("Hair", 0, 0, 0, 1, 0));
+  CU_ASSERT_EQUAL(tile_count_items(tile), 3);
+  CU_ASSERT_TRUE(strings_equal(item_get_name(tile_get_item_at(tile, 2)), "Hair"));
+
+  CU_ASSERT_PTR_NOT_NULL(tile_get_item_with_name(tile, "Hair"));
+  CU_ASSERT_PTR_NOT_NULL(tile_get_item_with_name(tile, "A gun"));
+  CU_ASSERT_PTR_NOT_NULL(tile_get_item_with_name(tile, "Pickaxe"));
+  CU_ASSERT_PTR_NULL(tile_get_item_with_name(tile, "Not existing"));
+
+  tile_remove_item(tile, "Pickaxe");
+  CU_ASSERT_EQUAL(tile_count_items(tile), 2);
+  CU_ASSERT_TRUE(strings_equal(item_get_name(tile_get_item_at(tile, 0)), "Hair"));
+
+  tile_remove_item(tile, "A gun");
+  CU_ASSERT_EQUAL(tile_count_items(tile), 1);
+  CU_ASSERT_PTR_NULL(tile_get_item_at(tile, 1));
+
+  tile_remove_item(tile, "Hair");
+  CU_ASSERT_EQUAL(tile_count_items(tile), 0);
+  CU_ASSERT_PTR_NULL(tile_get_item_at(tile, 0));
+
+  tile_free(tile);
+}
+
 void tile_test_suite(void) {
   CU_pSuite suite = CU_add_suite("Tile Tests", nullptr, nullptr);
   CU_add_test(suite, "Constructor and basic functions", &tile_constructor_test);
   CU_add_test(suite, "Serialization and deserialization", &tile_serialize_test);
+  CU_add_test(suite, "Items", &tile_items_test);
 }

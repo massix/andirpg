@@ -22,6 +22,7 @@
 #ifndef __TILE__H__
 #define __TILE__H__
 
+#include "item.h"
 #include "point.h"
 #include <msgpack/object.h>
 #include <msgpack/sbuffer.h>
@@ -50,7 +51,13 @@ bool         tile_is_traversable(Tile const *);
 uint32_t     tile_get_base_noise(Tile const *);
 uint32_t     tile_get_base_light(Tile const *);
 Point const *tile_get_coords(Tile const *);
-uint32_t     tile_count_items(Tile const *);
+
+// Items manipulation
+uint32_t    tile_count_items(Tile const *);
+void        tile_add_item(Tile *, Item *);
+void        tile_remove_item(Tile *, char const *);
+Item const *tile_get_item_at(Tile const *, uint);
+Item const *tile_get_item_with_name(Tile const *, char const *);
 
 // Setters
 void tile_set_base_light(Tile *, uint32_t);

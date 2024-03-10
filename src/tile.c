@@ -23,12 +23,14 @@
 #include "item.h"
 #include "point.h"
 #include "serde.h"
+#include "utils.h"
 #include <assert.h>
 #include <msgpack/object.h>
 #include <msgpack/pack.h>
 #include <msgpack/sbuffer.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/types.h>
 
 typedef struct Tile {
   TileKind _tile_kind;
@@ -168,6 +170,54 @@ inline uint32_t tile_count_items(Tile const *tile) {
   }
 
   return item_count;
+}
+
+void tile_add_item(Tile *tile, Item *item) {
+  size_t current_size = tile_count_items(tile);
+  tile->_items = realloc(tile->_items, sizeof(Item *) * (current_size + 1));
+  tile->_items[current_size] = item;
+  tile->_items[current_size + 1] = nullptr;
+}
+
+// When removing an item, we rearrange the array, the last item replaces the
+// removed item. We do not care about items' order here.
+void tile_remove_item(Tile *tile, char const *name) {
+  Item *found = nullptr;
+  uint  index = 0;
+  uint  current_size = tile_count_items(tile);
+  for (uint i = 0; i < current_size; i++) {
+    if (strings_equal(item_get_name(tile->_items[i]), name)) {
+      found = tile->_items[i];
+      index = i;
+      break;
+    }
+  }
+
+  if (found != nullptr) {
+    item_free(found);
+    tile->_items[index] = tile->_items[current_size - 1];
+    tile->_items = realloc(tile->_items, sizeof(Item *) * current_size);
+    tile->_items[current_size - 1] = nullptr;
+  }
+}
+
+Item const *tile_get_item_at(Tile const *tile, uint index) {
+  if (index >= tile_count_items(tile)) {
+    return nullptr;
+  }
+
+  return tile->_items[index];
+}
+
+Item const *tile_get_item_with_name(Tile const *tile, char const *name) {
+  Item *found = nullptr;
+  for (uint i = 0; i < tile_count_items(tile); i++) {
+    if (strings_equal(item_get_name(tile->_items[i]), name)) {
+      found = tile->_items[i];
+      break;
+    }
+  }
+  return found;
 }
 
 inline void tile_set_base_light(Tile *tile, uint32_t base_light) {
