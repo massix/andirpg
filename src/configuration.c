@@ -52,22 +52,23 @@ Configuration *configuration_new(const char *path) {
   return ret;
 }
 
-inline const char *configuration_get_path(Configuration *configuration) {
+inline const char *configuration_get_path(Configuration const *configuration) {
   return configuration->_file_path;
 }
-inline const char *configuration_get_player_name(Configuration *configuration) {
+
+inline const char *configuration_get_player_name(Configuration const *configuration) {
   return configuration->_player_name;
 }
 
-inline uint32_t configuration_get_player_starting_hp(Configuration *configuration) {
+inline uint32_t configuration_get_player_starting_hp(Configuration const *configuration) {
   return configuration->_player_starting_hp;
 }
 
-inline const char *configuration_get_log_output_file(Configuration *configuration) {
+inline const char *configuration_get_log_output_file(Configuration const *configuration) {
   return configuration->_log_output_file;
 }
 
-inline LogLevel configuration_get_log_level(Configuration *configuration) {
+inline LogLevel configuration_get_log_level(Configuration const *configuration) {
   return configuration->_log_level;
 }
 
@@ -122,6 +123,4 @@ void configuration_free(Configuration *configuration) {
   free(configuration->_player_name);
   free(configuration->_log_output_file);
   free(configuration);
-
-  configuration = nullptr;
 }

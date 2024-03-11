@@ -25,15 +25,20 @@
 #include <stdint.h>
 typedef struct Point Point;
 
+// Constructors and destructors
 Point *point_new(uint32_t x, uint32_t y);
+void   point_free(Point *);
 
+// Getters
 uint32_t point_get_x(Point const *);
 uint32_t point_get_y(Point const *);
-void     point_set_x(Point *, uint32_t);
-void     point_set_y(Point *, uint32_t);
-bool     points_equal(Point const *, Point const *);
 bool     point_has_coords(Point const *, uint32_t x, uint32_t y);
 
-void point_free(Point *);
+// Setters
+void point_set_x(Point *, uint32_t);
+void point_set_y(Point *, uint32_t);
+
+// Methods
+bool points_equal(Point const *, Point const *);
 
 #endif

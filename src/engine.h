@@ -31,23 +31,29 @@
 
 typedef struct Engine Engine;
 
+// Constructors and destructors
 Engine *engine_new(Map *);
+void    engine_serialize(Engine *, msgpack_sbuffer *);
 Engine *engine_deserialize(msgpack_object_map const *);
+void    engine_free(Engine *);
 
-Map     *engine_get_map(Engine *);
-void     engine_add_entity(Engine *, Entity *);
-void     engine_entity_attack(Engine *, Entity *, Entity *);
-void     engine_set_active_entity(Engine *, const char *);
-Entity  *engine_get_active_entity(Engine *);
-void     engine_clear_active_entity(Engine *);
+// Getters
+Map     *engine_get_map(Engine const *);
+Entity  *engine_get_active_entity(Engine const *);
+uint32_t engine_get_current_cycle(Engine const *);
+bool     engine_has_active_entity(Engine const *);
+
+// Setters
+void engine_set_active_entity(Engine *, const char *);
+void engine_clear_active_entity(Engine *);
+
+// Methods
 void     engine_handle_keypress(Engine *, char);
-bool     engine_has_active_entity(Engine *);
 void     engine_move_all_entities(Engine *);
-uint32_t engine_get_current_cycle(Engine *);
-void     engine_serialize(Engine *, msgpack_sbuffer *);
-
-// Fetch all the entities close to the active one
 Entity **engine_get_close_entities(Engine *, ssize_t *);
-void     engine_free(Engine *);
+
+// Entities
+void engine_add_entity(Engine *, Entity *);
+void engine_entity_attack(Engine *, Entity *, Entity *);
 
 #endif

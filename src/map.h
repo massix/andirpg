@@ -45,31 +45,36 @@ typedef struct TileProperties {
   bool     traversable;
 } TileProperties;
 
-// Constructors
+// Constructors and destructors
 Map *map_new(uint32_t x_size, uint32_t y_size, uint32_t max_entities, char const *);
-Map *map_deserialize(msgpack_object_map *);
-
-void          map_add_entity(Map *, Entity *);
-void          map_add_item(Map *, Item *, uint32_t x, uint32_t y);
-void          map_remove_item(Map *, const char *);
-bool          map_contains_item(Map *, const char *);
-uint32_t      map_count_items(Map *);
-char const   *map_get_name(Map const *);
-Item         *map_get_item(Map *, const char *);
-Entity       *map_get_entity(Map *, const char *);
-Entity      **map_get_all_entities(Map *);
-Entity      **map_filter_entities(Map *, bool (*)(Entity *), ssize_t *);
-void          map_remove_entity(Map *, const char *);
-int           map_get_index_of_entity(Map *, const char *);
-bool          map_contains_entity(Map *, const char *);
-int           map_count_entities(Map *);
-MapBoundaries map_get_boundaries(Map *);
-bool          map_is_tile_free(Map *, uint32_t x, uint32_t y);
-void          map_serialize(Map *, msgpack_sbuffer *);
-Tile const   *map_get_tile(Map const *, uint32_t x, uint32_t y);
-void          map_set_tile_properties(Map const *, uint32_t x, uint32_t y, TileProperties const *);
-
-// Destructor
+Map *map_deserialize(msgpack_object_map const *);
+void map_serialize(Map const *, msgpack_sbuffer *);
 void map_free(Map *);
+
+// Getters
+char const   *map_get_name(Map const *);
+Item         *map_get_item(Map const *, const char *);
+Entity       *map_get_entity(Map const *, const char *);
+Entity      **map_get_all_entities(Map const *);
+int           map_get_index_of_entity(Map const *, const char *);
+MapBoundaries map_get_boundaries(Map const *);
+
+// Methods for entities
+int      map_count_entities(Map const *);
+void     map_add_entity(Map *, Entity *);
+Entity **map_filter_entities(Map const *, bool (*)(Entity const *), ssize_t *);
+void     map_remove_entity(Map *, const char *);
+bool     map_contains_entity(Map const *, const char *);
+
+// Methods for items
+void     map_add_item(Map *, Item *, uint32_t x, uint32_t y);
+void     map_remove_item(Map *, const char *);
+bool     map_contains_item(Map const *, const char *);
+uint32_t map_count_items(Map const *);
+
+// Methods for tiles
+bool        map_is_tile_free(Map const *, uint32_t x, uint32_t y);
+Tile const *map_get_tile(Map const *, uint32_t x, uint32_t y);
+void        map_set_tile_properties(Map const *, uint32_t x, uint32_t y, TileProperties const *);
 
 #endif

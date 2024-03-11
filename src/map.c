@@ -82,205 +82,7 @@ Map *map_new(uint32_t x_size, uint32_t y_size, uint32_t max_entities, char const
   return ret;
 }
 
-uint32_t map_count_items(Map *map) {
-  return map->_items_size;
-}
-
-bool map_contains_item(Map *map, const char *item_name) {
-  for (size_t i = 0; i < map->_items_size; i++) {
-    if (strings_equal(item_get_name(map->_items[i]), item_name)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-void map_add_item(Map *map, Item *item, uint32_t x, uint32_t y) {
-  if (map_contains_item(map, item_get_name(item))) {
-    return;
-  }
-
-  map->_items_size++;
-  map->_items = realloc(map->_items, map->_items_size * sizeof(Item *));
-  map->_items[map->_items_size - 1] = item;
-  item_clear_coords(item);
-  item_set_coords(item, x, y);
-}
-
-Item *map_get_item(Map *map, const char *item_name) {
-  Item *ret = nullptr;
-  for (size_t i = 0; i < map->_items_size; i++) {
-    if (strings_equal(item_get_name(map->_items[i]), item_name)) {
-      ret = map->_items[i];
-      break;
-    }
-  }
-
-  return ret;
-}
-
-void map_remove_item(Map *map, const char *name) {
-  if (!map_contains_item(map, name)) {
-    return;
-  }
-
-  ssize_t item_index = -1;
-
-  for (size_t i = 0; i < map->_items_size; i++) {
-    if (strings_equal(item_get_name(map->_items[i]), name)) {
-      item_index = i;
-      item_free(map->_items[i]);
-    } else if (item_index != -1) {
-      map->_items[i - 1] = map->_items[i];
-    }
-  }
-
-  if (item_index != -1) {
-    map->_items_size--;
-    map->_items = realloc(map->_items, map->_items_size * sizeof(Item *));
-  }
-}
-
-Entity **map_get_all_entities(Map *map) {
-  return map->_entities;
-}
-
-Entity **map_filter_entities(Map *map, bool (*filter_function)(Entity *), ssize_t *nb_results) {
-  Entity **result = nullptr;
-  *nb_results = 0;
-
-  for (ssize_t i = 0; i < map->_last_index; i++) {
-    if (filter_function(map->_entities[i])) {
-      result = realloc(result, (*nb_results + 1) * sizeof(Entity *));
-      result[*nb_results] = map->_entities[i];
-      (*nb_results)++;
-    }
-  }
-
-  return result;
-}
-
-int map_count_entities(Map *map) {
-  int count = 0;
-  for (uint32_t i = 0; i < map->_entities_size; i++) {
-    if (map->_entities[i] != nullptr) {
-      count++;
-    }
-  }
-
-  return count;
-}
-
-void map_add_entity(Map *map, Entity *entity) {
-  Point *coords = entity_get_coords(entity);
-  if (!map_is_tile_free(map, point_get_x(coords), point_get_y(coords))) {
-    return;
-  }
-
-  if (map->_last_index < map->_entities_size) {
-    map->_entities[map->_last_index] = entity;
-    map->_last_index++;
-  }
-}
-
-Entity *map_get_entity(Map *map, const char *name) {
-  Entity *ret = nullptr;
-  for (uint32_t i = 0; i < map->_last_index; i++) {
-    Entity *current_entity = map->_entities[i];
-    if (strings_equal(entity_get_name(current_entity), name)) {
-      ret = current_entity;
-      break;
-    }
-  }
-
-  return ret;
-}
-
-inline char const *map_get_name(Map const *map) {
-  return map->_name;
-}
-
-int map_get_index_of_entity(Map *map, const char *name) {
-  int32_t index = -1;
-  for (int32_t i = 0; i < map->_last_index; i++) {
-    if (strings_equal(entity_get_name(map->_entities[i]), name)) {
-      index = i;
-      break;
-    }
-  }
-
-  return index;
-}
-
-void map_update_index(Map *map) {
-  uint32_t count = 0;
-  for (uint32_t i = 0; i < map->_entities_size; i++) {
-    if (map->_entities[i] == nullptr) {
-      break;
-    }
-
-    count++;
-  }
-
-  map->_last_index = count;
-}
-
-void map_remove_entity(Map *map, const char *name) {
-  if (!map_contains_entity(map, name)) {
-    return;
-  }
-
-  uint32_t removed_index = 0;
-  for (; removed_index < map->_last_index; removed_index++) {
-    Entity *current_entity = map->_entities[removed_index];
-    if (strings_equal(entity_get_name(current_entity), name)) {
-      map->_entities[removed_index] = nullptr;
-      entity_free(current_entity);
-      break;
-    }
-  }
-
-  // Now reorder all the heap!
-  for (uint32_t i = removed_index + 1; i < map->_last_index; i++) {
-    if (map->_entities[i] == nullptr) {
-      map->_last_index = i;
-      break;
-    }
-    map->_entities[i - 1] = map->_entities[i];
-    map->_entities[i] = nullptr;
-  }
-
-  map_update_index(map);
-}
-
-bool map_contains_entity(Map *map, const char *name) {
-  Entity *ret = map_get_entity(map, name);
-  return ret != nullptr ? 1 : 0;
-}
-
-bool map_is_tile_free(Map *map, uint32_t x, uint32_t y) {
-  bool is_free = true;
-  for (uint32_t i = 0; i < map->_last_index; i++) {
-    Point *point = entity_get_coords(map->_entities[i]);
-    if (point_get_x(point) == x && point_get_y(point) == y) {
-      is_free = false;
-      break;
-    }
-  }
-
-  return is_free;
-}
-
-MapBoundaries map_get_boundaries(Map *map) {
-  MapBoundaries boundaries;
-  boundaries.x = map->_x_size;
-  boundaries.y = map->_y_size;
-
-  return boundaries;
-}
-
-Map *map_deserialize(msgpack_object_map *msgpack_map) {
+Map *map_deserialize(msgpack_object_map const *msgpack_map) {
   LOG_INFO("Unmarshalling map", 0);
 
   // Check the validity of the map before starting the Unmarshalling process
@@ -335,7 +137,7 @@ Map *map_deserialize(msgpack_object_map *msgpack_map) {
   return map;
 }
 
-void map_serialize(Map *map, msgpack_sbuffer *buffer) {
+void map_serialize(Map const *map, msgpack_sbuffer *buffer) {
   msgpack_packer packer;
   msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
 
@@ -377,6 +179,226 @@ void map_serialize(Map *map, msgpack_sbuffer *buffer) {
   }
 }
 
+void map_free(Map *map) {
+  for (uint32_t i = 0; i < map->_last_index; i++) {
+    entity_free(map->_entities[i]);
+  }
+
+  if (map->_items != nullptr) {
+    for (size_t i = 0; i < map->_items_size; i++) {
+      item_free(map->_items[i]);
+    }
+    free(map->_items);
+  }
+
+  for (uint32_t i = 0; i < (unsigned long)map->_x_size * map->_y_size; i++) {
+    tile_free(map->_tiles[i]);
+  }
+
+  free(map->_tiles);
+  free(map->_entities);
+  free(map->_name);
+  free(map);
+}
+
+inline char const *map_get_name(Map const *map) {
+  return map->_name;
+}
+
+Item *map_get_item(Map const *map, const char *item_name) {
+  Item *ret = nullptr;
+  for (size_t i = 0; i < map->_items_size; i++) {
+    if (strings_equal(item_get_name(map->_items[i]), item_name)) {
+      ret = map->_items[i];
+      break;
+    }
+  }
+
+  return ret;
+}
+
+Entity *map_get_entity(Map const *map, const char *name) {
+  Entity *ret = nullptr;
+  for (uint32_t i = 0; i < map->_last_index; i++) {
+    Entity *current_entity = map->_entities[i];
+    if (strings_equal(entity_get_name(current_entity), name)) {
+      ret = current_entity;
+      break;
+    }
+  }
+
+  return ret;
+}
+
+Entity **map_get_all_entities(Map const *map) {
+  return map->_entities;
+}
+
+int map_get_index_of_entity(Map const *map, const char *name) {
+  int32_t index = -1;
+  for (int32_t i = 0; i < map->_last_index; i++) {
+    if (strings_equal(entity_get_name(map->_entities[i]), name)) {
+      index = i;
+      break;
+    }
+  }
+
+  return index;
+}
+
+MapBoundaries map_get_boundaries(Map const *map) {
+  MapBoundaries boundaries;
+  boundaries.x = map->_x_size;
+  boundaries.y = map->_y_size;
+
+  return boundaries;
+}
+
+int map_count_entities(Map const *map) {
+  int count = 0;
+  for (uint32_t i = 0; i < map->_entities_size; i++) {
+    if (map->_entities[i] != nullptr) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+void map_add_entity(Map *map, Entity *entity) {
+  Point const *coords = entity_get_coords(entity);
+  if (!map_is_tile_free(map, point_get_x(coords), point_get_y(coords))) {
+    return;
+  }
+
+  if (map->_last_index < map->_entities_size) {
+    map->_entities[map->_last_index] = entity;
+    map->_last_index++;
+  }
+}
+
+Entity **map_filter_entities(Map const *map, bool (*filter_function)(Entity const *), ssize_t *nb_results) {
+  Entity **result = nullptr;
+  *nb_results = 0;
+
+  for (ssize_t i = 0; i < map->_last_index; i++) {
+    if (filter_function(map->_entities[i])) {
+      result = realloc(result, (*nb_results + 1) * sizeof(Entity *));
+      result[*nb_results] = map->_entities[i];
+      (*nb_results)++;
+    }
+  }
+
+  return result;
+}
+
+void map_update_index(Map *map) {
+  uint32_t count = 0;
+  for (uint32_t i = 0; i < map->_entities_size; i++) {
+    if (map->_entities[i] == nullptr) {
+      break;
+    }
+
+    count++;
+  }
+
+  map->_last_index = count;
+}
+
+void map_remove_entity(Map *map, const char *name) {
+  if (!map_contains_entity(map, name)) {
+    return;
+  }
+
+  uint32_t removed_index = 0;
+  for (; removed_index < map->_last_index; removed_index++) {
+    Entity *current_entity = map->_entities[removed_index];
+    if (strings_equal(entity_get_name(current_entity), name)) {
+      map->_entities[removed_index] = nullptr;
+      entity_free(current_entity);
+      break;
+    }
+  }
+
+  // Now reorder all the heap!
+  for (uint32_t i = removed_index + 1; i < map->_last_index; i++) {
+    if (map->_entities[i] == nullptr) {
+      map->_last_index = i;
+      break;
+    }
+    map->_entities[i - 1] = map->_entities[i];
+    map->_entities[i] = nullptr;
+  }
+
+  map_update_index(map);
+}
+
+bool map_contains_entity(Map const *map, const char *name) {
+  Entity const *ret = map_get_entity(map, name);
+  return ret != nullptr ? 1 : 0;
+}
+
+void map_add_item(Map *map, Item *item, uint32_t x, uint32_t y) {
+  if (map_contains_item(map, item_get_name(item))) {
+    return;
+  }
+
+  map->_items_size++;
+  map->_items = realloc(map->_items, map->_items_size * sizeof(Item *));
+  map->_items[map->_items_size - 1] = item;
+  item_clear_coords(item);
+  item_set_coords(item, x, y);
+}
+
+void map_remove_item(Map *map, const char *name) {
+  if (!map_contains_item(map, name)) {
+    return;
+  }
+
+  ssize_t item_index = -1;
+
+  for (size_t i = 0; i < map->_items_size; i++) {
+    if (strings_equal(item_get_name(map->_items[i]), name)) {
+      item_index = i;
+      item_free(map->_items[i]);
+    } else if (item_index != -1) {
+      map->_items[i - 1] = map->_items[i];
+    }
+  }
+
+  if (item_index != -1) {
+    map->_items_size--;
+    map->_items = realloc(map->_items, map->_items_size * sizeof(Item *));
+  }
+}
+
+bool map_contains_item(Map const *map, const char *item_name) {
+  for (size_t i = 0; i < map->_items_size; i++) {
+    if (strings_equal(item_get_name(map->_items[i]), item_name)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+uint32_t map_count_items(Map const *map) {
+  return map->_items_size;
+}
+
+bool map_is_tile_free(Map const *map, uint32_t x, uint32_t y) {
+  bool is_free = true;
+  for (uint32_t i = 0; i < map->_last_index; i++) {
+    Point const *point = entity_get_coords(map->_entities[i]);
+    if (point_get_x(point) == x && point_get_y(point) == y) {
+      is_free = false;
+      break;
+    }
+  }
+
+  return is_free;
+}
+
 // Internal method, we're allowed to modify a tile only by passing by
 // the exposed map's APIs
 Tile *map_modify_tile(Map const *map, uint32_t x, uint32_t y) {
@@ -399,27 +421,5 @@ inline void map_set_tile_properties(Map const *map, uint32_t x, uint32_t y, Tile
     tile_set_traversable(tile_at, tile_props->traversable);
     tile_set_kind(tile_at, tile_props->kind);
   }
-}
-
-void map_free(Map *map) {
-  for (uint32_t i = 0; i < map->_last_index; i++) {
-    entity_free(map->_entities[i]);
-  }
-
-  if (map->_items != nullptr) {
-    for (size_t i = 0; i < map->_items_size; i++) {
-      item_free(map->_items[i]);
-    }
-    free(map->_items);
-  }
-
-  for (uint32_t i = 0; i < (unsigned long)map->_x_size * map->_y_size; i++) {
-    tile_free(map->_tiles[i]);
-  }
-
-  free(map->_tiles);
-  free(map->_entities);
-  free(map->_name);
-  free(map);
 }
 

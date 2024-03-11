@@ -30,7 +30,6 @@
 #include <msgpack/pack.h>
 #include <msgpack/sbuffer.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -49,23 +48,6 @@ struct Entity {
   Item     **_inventory;
 };
 
-bool entity_can_move(Entity *ent) {
-  bool ret = true;
-  switch (ent->_type) {
-    case HUMAN:
-    case ANIMAL:
-    case INHUMAN:
-      ret = true;
-      break;
-    case TREE:
-    case MOUNTAIN:
-      ret = false;
-      break;
-  }
-
-  return ret && entity_is_alive(ent);
-}
-
 Entity *entity_new(uint32_t starting_lp, EntityType type, const char *name, uint32_t start_x, uint32_t start_y) {
   LOG_DEBUG("Creating new entity '%s'", name);
 
@@ -80,7 +62,7 @@ Entity *entity_new(uint32_t starting_lp, EntityType type, const char *name, uint
   return ret;
 }
 
-Entity *entity_deserialize(msgpack_object_map *map) {
+Entity *entity_deserialize(msgpack_object_map const *map) {
   LOG_INFO("Unmarshalling entity", 0);
   LOG_INFO("Validating map", 0);
 
@@ -123,7 +105,15 @@ Entity *entity_deserialize(msgpack_object_map *map) {
   return entity;
 }
 
-void entity_serialize(Entity *ent, msgpack_sbuffer *buffer) {
+void entity_free(Entity *entity) {
+  free(entity->_name);
+  point_free(entity->_coords);
+  entity_inventory_clear(entity);
+  free(entity->_inventory);
+  free(entity);
+}
+
+void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
   msgpack_packer packer;
   msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
 
@@ -154,40 +144,49 @@ void entity_serialize(Entity *ent, msgpack_sbuffer *buffer) {
   }
 }
 
-char entity_type_to_char(EntityType entity_type) {
-  char ret = '.';
-  switch (entity_type) {
-    case HUMAN:
-      ret = '@';
-      break;
-    case ANIMAL:
-      ret = '#';
-      break;
-    case INHUMAN:
-      ret = '&';
-      break;
-    case TREE:
-      ret = '%';
-      break;
-    case MOUNTAIN:
-      ret = '^';
-      break;
-  }
-
-  return ret;
+inline uint32_t entity_get_life_points(Entity const *entity) {
+  return entity->_lp;
 }
 
-const char *entity_type_to_string(EntityType entity_type) {
-  switch (entity_type) {
+inline uint32_t entity_get_starting_life_points(Entity const *entity) {
+  return entity->_starting_lp;
+}
+
+EntityType entity_get_entity_type(Entity const *entity) {
+  return entity->_type;
+}
+
+inline const char *entity_get_name(Entity const *entity) {
+  return entity->_name;
+}
+
+Point const *entity_get_coords(Entity const *entity) {
+  return entity->_coords;
+}
+
+bool entity_can_move(Entity const *ent) {
+  bool ret = true;
+  switch (ent->_type) {
     case HUMAN:
-      return "Human";
     case ANIMAL:
-      return "Animal";
     case INHUMAN:
-      return "Inhuman";
-    default:
-      return "Unknown";
+      ret = true;
+      break;
+    case TREE:
+    case MOUNTAIN:
+      ret = false;
+      break;
   }
+
+  return ret && entity_is_alive(ent);
+}
+
+bool entity_is_alive(Entity const *entity) {
+  return entity->_lp > 0;
+}
+
+bool entity_is_dead(Entity const *entity) {
+  return !entity_is_alive(entity);
 }
 
 void entity_move(Entity *entity, uint32_t delta_x, uint32_t delta_y) {
@@ -212,38 +211,33 @@ void entity_heal(Entity *entity, uint32_t life_points) {
 }
 
 void entity_resurrect(Entity *entity) {
-  if (*(entity_get_entity_type(entity)) == INHUMAN && entity_is_dead(entity)) {
+  if (entity_get_entity_type(entity) == INHUMAN && entity_is_dead(entity)) {
     LOG_INFO("Resurrecting '%s'", entity_get_name(entity));
     entity->_lp = entity->_starting_lp;
   }
 }
 
-Point *entity_get_coords(Entity *entity) {
-  return entity->_coords;
+size_t entity_inventory_count(Entity const *entity) {
+  size_t count = 0;
+
+  Item const *current_item = entity->_inventory[count];
+  while (current_item != nullptr) {
+    current_item = entity->_inventory[++count];
+  }
+
+  return count;
 }
 
-bool entity_is_alive(Entity *entity) {
-  return entity->_lp > 0;
-}
+void entity_inventory_add_item(Entity *entity, Item *item) {
+  size_t current_count = entity_inventory_count(entity) + 1; // include the nullptr
+  LOG_INFO("Adding item '%s' to '%s'", item_get_name(item), entity_get_name(entity));
 
-bool entity_is_dead(Entity *entity) {
-  return !entity_is_alive(entity);
-}
+  // current_count + 1 adds a new "slot"
+  entity->_inventory = realloc(entity->_inventory, (current_count + 1) * sizeof(Item *));
 
-EntityType *entity_get_entity_type(Entity *entity) {
-  return &(entity->_type);
-}
-
-inline const char *entity_get_name(Entity *entity) {
-  return entity->_name;
-}
-
-inline uint32_t entity_get_life_points(Entity *entity) {
-  return entity->_lp;
-}
-
-inline uint32_t entity_get_starting_life_points(Entity *entity) {
-  return entity->_starting_lp;
+  // current_count - 1 is the old nullptr
+  entity->_inventory[current_count - 1] = item;
+  entity->_inventory[current_count] = nullptr;
 }
 
 // When removing an item from the inventory, we will replace the empty slot with the last item of the inventory
@@ -259,12 +253,12 @@ inline uint32_t entity_get_starting_life_points(Entity *entity) {
 // 1. an armor (was number 4, now is number 2)
 // 2. a dagger
 void entity_inventory_remove_item(Entity *entity, const char *item_name) {
-  bool   need_cleaning = false;
-  size_t item_index = -1;
-  size_t total_items = entity_inventory_count(entity);
+  bool    need_cleaning = false;
+  ssize_t item_index = -1;
+  size_t  total_items = entity_inventory_count(entity);
   LOG_INFO("Removing item '%s' from '%s'", item_name, entity_get_name(entity));
 
-  for (size_t i = 0; i < total_items; i++) {
+  for (ssize_t i = 0; i < total_items; i++) {
     if (strings_equal(item_get_name(entity->_inventory[i]), item_name)) {
       LOG_DEBUG("Item found, removing", 0);
       item_index = i;
@@ -286,29 +280,21 @@ void entity_inventory_remove_item(Entity *entity, const char *item_name) {
   }
 }
 
-size_t entity_inventory_count(Entity *entity) {
-  size_t count = 0;
-  Item  *current_item = entity->_inventory[count];
-  while (current_item != nullptr) {
-    current_item = entity->_inventory[++count];
+void entity_inventory_clear(Entity *entity) {
+  size_t current_index = 0;
+  Item  *pointed_item = entity->_inventory[current_index];
+  LOG_DEBUG("Cleaning inventory for '%s'", entity_get_name(entity));
+
+  while (pointed_item != nullptr) {
+    item_free(pointed_item);
+    pointed_item = entity->_inventory[++current_index];
   }
 
-  return count;
+  entity->_inventory = realloc(entity->_inventory, 1 * sizeof(Item *));
+  entity->_inventory[0] = nullptr;
 }
 
-void entity_inventory_add_item(Entity *entity, Item *item) {
-  size_t current_count = entity_inventory_count(entity) + 1; // include the nullptr
-  LOG_INFO("Adding item '%s' to '%s'", item_get_name(item), entity_get_name(entity));
-
-  // current_count + 1 adds a new "slot"
-  entity->_inventory = realloc(entity->_inventory, (current_count + 1) * sizeof(Item *));
-
-  // current_count - 1 is the old nullptr
-  entity->_inventory[current_count - 1] = item;
-  entity->_inventory[current_count] = nullptr;
-}
-
-Item **entity_inventory_filter(Entity *entity, bool (*filter_function)(Item *), ssize_t *items_found) {
+Item **entity_inventory_filter(Entity *entity, bool (*filter_function)(Item const *), ssize_t *items_found) {
   Item **elements = calloc(entity_inventory_count(entity), sizeof(Item *));
   *items_found = 0;
   ssize_t current_index = 0;
@@ -326,28 +312,6 @@ Item **entity_inventory_filter(Entity *entity, bool (*filter_function)(Item *), 
   return elements;
 }
 
-inline Item **entity_inventory_get(Entity *entity) {
+inline Item **entity_inventory_get(Entity const *entity) {
   return entity->_inventory;
-}
-
-void entity_inventory_clear(Entity *entity) {
-  size_t current_index = 0;
-  Item  *pointed_item = entity->_inventory[current_index];
-  LOG_DEBUG("Cleaning inventory for '%s'", entity_get_name(entity));
-
-  while (pointed_item != nullptr) {
-    item_free(pointed_item);
-    pointed_item = entity->_inventory[++current_index];
-  }
-
-  entity->_inventory = realloc(entity->_inventory, 1 * sizeof(Item *));
-  entity->_inventory[0] = nullptr;
-}
-
-void entity_free(Entity *entity) {
-  free(entity->_name);
-  point_free(entity->_coords);
-  entity_inventory_clear(entity);
-  free(entity->_inventory);
-  free(entity);
 }

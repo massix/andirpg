@@ -25,12 +25,11 @@ void entity_creation_test(void) {
   Entity *human = entity_new(30, HUMAN, "Avatar", 20, 30);
 
   CU_ASSERT_TRUE(strings_equal(entity_get_name(human), "Avatar"));
-  CU_ASSERT_EQUAL(*entity_get_entity_type(human), HUMAN);
-  CU_ASSERT_TRUE(strings_equal(entity_type_to_string(*entity_get_entity_type(human)), "Human"));
+  CU_ASSERT_EQUAL(entity_get_entity_type(human), HUMAN);
   CU_ASSERT_EQUAL(entity_get_life_points(human), 30);
-  CU_ASSERT_EQUAL(*entity_get_entity_type(human), HUMAN);
+  CU_ASSERT_EQUAL(entity_get_entity_type(human), HUMAN);
 
-  Point *entity_coords = entity_get_coords(human);
+  Point const *entity_coords = entity_get_coords(human);
   CU_ASSERT_EQUAL(point_get_x(entity_coords), 20);
   CU_ASSERT_EQUAL(point_get_y(entity_coords), 30);
 
@@ -122,15 +121,15 @@ void entity_move_test(void) {
   entity_free(mountain);
 }
 
-bool filter_weapons(Item *item) {
+bool filter_weapons(Item const *item) {
   return strncmp(item_get_name(item), "Weapon", 6) == 0;
 }
 
-bool filter_tools(Item *item) {
+bool filter_tools(Item const *item) {
   return item_get_type(item) == TOOL;
 }
 
-bool filter_none(Item *) {
+bool filter_none(Item const *) {
   return false;
 }
 
@@ -298,7 +297,7 @@ void entity_deserialize_test(void) {
   CU_ASSERT_TRUE(points_equal(entity_get_coords(entity), entity_get_coords(rebuilt)));
   CU_ASSERT_EQUAL(entity_get_life_points(entity), entity_get_life_points(rebuilt));
   CU_ASSERT_EQUAL(entity_get_starting_life_points(entity), entity_get_starting_life_points(rebuilt));
-  CU_ASSERT_EQUAL(*entity_get_entity_type(entity), *entity_get_entity_type(rebuilt));
+  CU_ASSERT_EQUAL(entity_get_entity_type(entity), entity_get_entity_type(rebuilt));
   CU_ASSERT_EQUAL(entity_inventory_count(entity), entity_inventory_count(rebuilt));
 
   Item **entity_inventory = entity_inventory_get(entity);
