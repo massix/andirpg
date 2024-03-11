@@ -91,7 +91,7 @@ void item_coordinates_test(void) {
   item_set_coords(without_coords, 10, 12);
   CU_ASSERT_TRUE(item_has_coords(without_coords));
 
-  Point *coords = item_get_coords(without_coords);
+  Point const *coords = item_get_coords(without_coords);
   CU_ASSERT_EQUAL(point_get_x(coords), 10);
   CU_ASSERT_EQUAL(point_get_y(coords), 12);
 

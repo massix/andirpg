@@ -41,50 +41,43 @@ typedef struct WoodProperties   WoodProperties;
 typedef enum ItemType { TOOL, WEAPON, ARMOR, FORAGE, GEM } ItemType;
 typedef enum ForageType { BERRY, WOOD } ForageType;
 
-// Build a generic Item
+// Constructors and destructors
 Item *item_new(ItemType, const char *, uint32_t weight, uint32_t value);
-Item *item_clone(Item *);
-Item *item_deserialize(msgpack_object_map *);
-
-bool        item_has_properties(Item *);
-void       *item_get_properties(Item *);
-const char *item_get_name(Item const *);
-uint32_t    item_get_weight(Item *);
-uint32_t    item_get_value(Item *);
-ItemType    item_get_type(Item *);
-void        item_serialize(Item *, msgpack_sbuffer *);
-
-// By default, an item belongs to an entity, but an Item can also be present
-// on the map, hence we might have coordinates (although they are not mandatory)
-bool   item_has_coords(Item *);
-Point *item_get_coords(Item *);
-void   item_set_coords(Item *, uint32_t x, uint32_t y);
-
-// If an item stops belonging to the map and re-belongs to an entity
-void item_clear_coords(Item *);
-
-// Builders for specific items
+Item *item_clone(Item const *);
+Item *item_deserialize(msgpack_object_map const *);
 Item *weapon_new(const char *, uint32_t weight, uint32_t value, uint8_t hands, uint32_t attack_power, uint8_t life_points);
 Item *tool_new(const char *, uint32_t weight, uint32_t value, uint8_t hands, uint8_t life_points);
 Item *armor_new(const char *, uint32_t weight, uint32_t value, uint32_t defense_value, uint8_t life_points, uint8_t armor_class);
+void  item_serialize(Item const *, msgpack_sbuffer *);
+void  item_free(Item *);
 
-// Getters for specific properties
+// Generic Getters
+bool         item_has_properties(Item const *);
+void        *item_get_properties(Item const *);
+const char  *item_get_name(Item const *);
+uint32_t     item_get_weight(Item const *);
+uint32_t     item_get_value(Item const *);
+ItemType     item_get_type(Item const *);
+bool         item_has_coords(Item const *);
+Point const *item_get_coords(Item const *);
 
-// WEAPON
-uint8_t  weapon_get_hands(WeaponProperties *);
-uint32_t weapon_get_attack_power(WeaponProperties *);
-uint8_t  weapon_get_life_points(WeaponProperties *);
+// Getters for Weapon
+uint8_t  weapon_get_hands(WeaponProperties const *);
+uint32_t weapon_get_attack_power(WeaponProperties const *);
+uint8_t  weapon_get_life_points(WeaponProperties const *);
 
-// TOOL
-uint8_t tool_get_hands(ToolProperties *);
-uint8_t tool_get_life_points(ToolProperties *);
+// Getters for Tool
+uint8_t tool_get_hands(ToolProperties const *);
+uint8_t tool_get_life_points(ToolProperties const *);
 
-// ARMOR
-uint32_t armor_get_defense_value(ArmorProperties *);
-uint8_t  armor_get_life_points(ArmorProperties *);
-uint8_t  armor_get_armor_class(ArmorProperties *);
+// Getters for Armor
+uint32_t armor_get_defense_value(ArmorProperties const *);
+uint8_t  armor_get_life_points(ArmorProperties const *);
+uint8_t  armor_get_armor_class(ArmorProperties const *);
 
-void item_free(Item *);
+// Setters
+void item_set_coords(Item *, uint32_t x, uint32_t y);
+void item_clear_coords(Item *);
 
 #endif
 

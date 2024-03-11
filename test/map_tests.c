@@ -31,8 +31,8 @@ void map_creation_test(void) {
   map_free(map);
 }
 
-bool filter_zombies(Entity *entity) {
-  return *(entity_get_entity_type(entity)) == INHUMAN;
+bool filter_zombies(Entity const *entity) {
+  return entity_get_entity_type(entity) == INHUMAN;
 }
 
 void map_entities_test(void) {

@@ -70,8 +70,9 @@ char **map_window_generate_matrix(MapWindow *mpw) {
   // Now take all the entities from the map and draw them in the matrix
   for (uint32_t i = 0; i < entities_size; i++) {
     Entity *current_entity = all_entities[i];
-    Point  *point = entity_get_coords(current_entity);
-    matrix[point_get_x(point)][point_get_y(point)] = entity_type_to_char(*entity_get_entity_type(current_entity));
+
+    Point const *point = entity_get_coords(current_entity);
+    matrix[point_get_x(point)][point_get_y(point)] = entity_get_entity_type(current_entity);
   }
 
   return matrix;

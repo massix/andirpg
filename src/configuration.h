@@ -27,15 +27,15 @@
 typedef struct Configuration Configuration;
 
 Configuration *configuration_new(const char *);
-const char    *configuration_get_path(Configuration *);
+const char    *configuration_get_path(Configuration const *);
 
 // Player section
-const char *configuration_get_player_name(Configuration *);
-uint32_t    configuration_get_player_starting_hp(Configuration *);
+const char *configuration_get_player_name(Configuration const *);
+uint32_t    configuration_get_player_starting_hp(Configuration const *);
 
 // Log section
-const char *configuration_get_log_output_file(Configuration *);
-LogLevel    configuration_get_log_level(Configuration *);
+const char *configuration_get_log_output_file(Configuration const *);
+LogLevel    configuration_get_log_level(Configuration const *);
 
 void configuration_init(Configuration *);
 void configuration_free(Configuration *);

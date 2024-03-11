@@ -35,12 +35,20 @@ Point *point_new(uint32_t x, uint32_t y) {
   return ret;
 }
 
+void point_free(Point *point) {
+  free(point);
+}
+
 inline uint32_t point_get_x(Point const *point) {
   return point->_x;
 }
 
 inline uint32_t point_get_y(Point const *point) {
   return point->_y;
+}
+
+inline bool point_has_coords(Point const *point, uint32_t x, uint32_t y) {
+  return point->_x == x && point->_y == y;
 }
 
 inline void point_set_x(Point *point, uint32_t x) {
@@ -53,12 +61,4 @@ inline void point_set_y(Point *point, uint32_t y) {
 
 inline bool points_equal(Point const *lhs, Point const *rhs) {
   return lhs->_x == rhs->_x && rhs->_y && lhs->_y;
-}
-
-inline bool point_has_coords(Point const *point, uint32_t x, uint32_t y) {
-  return point->_x == x && point->_y == y;
-}
-
-void point_free(Point *point) {
-  free(point);
 }
