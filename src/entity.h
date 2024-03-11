@@ -38,17 +38,51 @@ typedef enum EntityType {
   INHUMAN = '&',
   TREE = '%',
   MOUNTAIN = '^',
+  WATER = '~',
 } EntityType;
+
+typedef struct EntityBuilder {
+  EntityType type;
+  uint32_t   life_points;
+  uint32_t   mental_health;
+  uint32_t   level;
+  uint32_t   xp;
+  uint32_t   hearing_distance;
+  uint32_t   seeing_distance;
+  char      *name;
+
+  struct EntityBuilder *(*with_type)(struct EntityBuilder *, EntityType);
+  struct EntityBuilder *(*with_life_points)(struct EntityBuilder *, uint32_t);
+  struct EntityBuilder *(*with_mental_health)(struct EntityBuilder *, uint32_t);
+  struct EntityBuilder *(*with_level)(struct EntityBuilder *, uint32_t);
+  struct EntityBuilder *(*with_xp)(struct EntityBuilder *, uint32_t);
+  struct EntityBuilder *(*with_hearing_distance)(struct EntityBuilder *, uint32_t);
+  struct EntityBuilder *(*with_seeing_distance)(struct EntityBuilder *, uint32_t);
+  struct EntityBuilder *(*with_name)(struct EntityBuilder *, char const *);
+  Entity *(*build)(struct EntityBuilder const *);
+} EntityBuilder;
+
+EntityBuilder *entity_builder_new();
+void           entity_builder_free(EntityBuilder *);
 
 // Constructors and destructors
 Entity *entity_new(uint32_t starting_lp, EntityType type, const char *name, uint32_t start_x, uint32_t start_y);
 Entity *entity_deserialize(msgpack_object_map const *);
-void    entity_free(Entity *);
 void    entity_serialize(Entity const *, msgpack_sbuffer *);
+void    entity_free(Entity *);
 
 // Getters
 uint32_t     entity_get_life_points(Entity const *);
 uint32_t     entity_get_starting_life_points(Entity const *);
+uint32_t     entity_get_mental_health(Entity const *);
+uint32_t     entity_get_starting_mental_health(Entity const *);
+uint32_t     entity_get_hunger(Entity const *);
+uint32_t     entity_get_thirst(Entity const *);
+uint32_t     entity_get_tiredness(Entity const *);
+uint32_t     entity_get_xp(Entity const *);
+uint32_t     entity_get_current_level(Entity const *);
+uint32_t     entity_get_hearing_distance(Entity const *);
+uint32_t     entity_get_seeing_distance(Entity const *);
 EntityType   entity_get_entity_type(Entity const *);
 const char  *entity_get_name(Entity const *);
 Point const *entity_get_coords(Entity const *);

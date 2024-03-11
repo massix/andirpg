@@ -42,11 +42,106 @@
 struct Entity {
   uint32_t   _lp;
   uint32_t   _starting_lp;
+  uint32_t   _mental_health;
+  uint32_t   _starting_mental_health;
+  uint32_t   _hunger;
+  uint32_t   _thirst;
+  uint32_t   _tiredness;
+  uint32_t   _xp;
+  uint32_t   _current_level;
+  uint32_t   _hearing_distance;
+  uint32_t   _seeing_distance;
   EntityType _type;
   char      *_name;
   Point     *_coords;
   Item     **_inventory;
 };
+
+EntityBuilder *eb_with_type(EntityBuilder *self, EntityType type) {
+  self->type = type;
+  return self;
+}
+
+EntityBuilder *eb_with_lp(EntityBuilder *self, uint32_t life_points) {
+  self->life_points = life_points;
+  return self;
+}
+
+EntityBuilder *eb_with_mh(EntityBuilder *self, uint32_t mental_health) {
+  self->mental_health = mental_health;
+  return self;
+}
+
+EntityBuilder *eb_with_level(EntityBuilder *self, uint32_t level) {
+  self->level = level;
+  return self;
+}
+
+EntityBuilder *eb_with_xp(EntityBuilder *self, uint32_t xp) {
+  self->xp = xp;
+  return self;
+}
+
+EntityBuilder *eb_with_hd(EntityBuilder *self, uint32_t hearing_distance) {
+  self->hearing_distance = hearing_distance;
+  return self;
+}
+
+EntityBuilder *eb_with_seeing_distance(EntityBuilder *self, uint32_t seeing_distance) {
+  self->seeing_distance = seeing_distance;
+  return self;
+}
+
+EntityBuilder *eb_with_name(EntityBuilder *self, char const *name) {
+  free(self->name);
+  self->name = strdup(name);
+  return self;
+}
+
+Entity *eb_build(EntityBuilder const *self) {
+  Entity *ent = entity_new(self->life_points, self->type, self->name, 10, 10);
+  ent->_current_level = self->level;
+  ent->_xp = self->xp;
+  ent->_hearing_distance = self->hearing_distance;
+  ent->_seeing_distance = self->seeing_distance;
+  ent->_starting_mental_health = self->mental_health;
+  ent->_mental_health = self->mental_health;
+
+  return ent;
+}
+
+// Builder for entities
+EntityBuilder *entity_builder_new() {
+  EntityBuilder *builder = calloc(1, sizeof(EntityBuilder));
+
+  // Init with some default values
+  builder->name = strdup("Avatar");
+  builder->type = INHUMAN;
+  builder->life_points = 30;
+  builder->mental_health = 30;
+  builder->level = 0;
+  builder->xp = 0;
+  builder->seeing_distance = 10;
+  builder->hearing_distance = 10;
+
+  // Methods
+  builder->with_type = &eb_with_type;
+  builder->with_life_points = &eb_with_lp;
+  builder->with_mental_health = &eb_with_mh;
+  builder->with_level = &eb_with_level;
+  builder->with_xp = &eb_with_xp;
+  builder->with_hearing_distance = &eb_with_hd;
+  builder->with_seeing_distance = &eb_with_seeing_distance;
+  builder->with_name = &eb_with_name;
+  builder->build = &eb_build;
+
+  return builder;
+}
+
+void entity_builder_free(EntityBuilder *self) {
+  free(self->name);
+  free(self);
+}
 
 Entity *entity_new(uint32_t starting_lp, EntityType type, const char *name, uint32_t start_x, uint32_t start_y) {
   LOG_DEBUG("Creating new entity '%s'", name);
@@ -59,6 +154,18 @@ Entity *entity_new(uint32_t starting_lp, EntityType type, const char *name, uint
   ret->_inventory = calloc(1, sizeof(Item *));
   ret->_inventory[0] = nullptr;
   ret->_coords = point_new(start_x, start_y);
+
+  // FIXME: remove these default values
+  ret->_mental_health = 30;
+  ret->_starting_mental_health = 30;
+  ret->_hunger = 0;
+  ret->_thirst = 0;
+  ret->_tiredness = 0;
+  ret->_xp = 0;
+  ret->_current_level = 0;
+  ret->_hearing_distance = 0;
+  ret->_seeing_distance = 0;
+
   return ret;
 }
 
@@ -66,17 +173,40 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   LOG_INFO("Unmarshalling entity", 0);
   LOG_INFO("Validating map", 0);
 
-  assert(map->size == 6);
-  serde_map_assert(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "current_lp");
-  serde_map_assert(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "starting_lp");
-  serde_map_assert(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "type");
-  serde_map_assert(map, MSGPACK_OBJECT_STR, "name");
-  serde_map_assert(map, MSGPACK_OBJECT_ARRAY, "coords");
-  serde_map_assert(map, MSGPACK_OBJECT_ARRAY, "inventory");
+  assert(map->size == 15);
 
-  uint32_t   current_lp = *(uint32_t *)serde_map_get(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "current_lp");
-  uint32_t   starting_lp = *(uint32_t *)serde_map_get(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "starting_lp");
-  EntityType type = *(EntityType *)serde_map_get(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "type");
+#define sma(t, f) serde_map_assert(map, MSGPACK_OBJECT_##t, f);
+
+  sma(POSITIVE_INTEGER, "lp");
+  sma(POSITIVE_INTEGER, "starting_lp");
+  sma(POSITIVE_INTEGER, "mental_health");
+  sma(POSITIVE_INTEGER, "starting_mental_health");
+  sma(POSITIVE_INTEGER, "hunger");
+  sma(POSITIVE_INTEGER, "thirst");
+  sma(POSITIVE_INTEGER, "tiredness");
+  sma(POSITIVE_INTEGER, "xp");
+  sma(POSITIVE_INTEGER, "current_level");
+  sma(POSITIVE_INTEGER, "hearing_distance");
+  sma(POSITIVE_INTEGER, "seeing_distance");
+  sma(POSITIVE_INTEGER, "type");
+  sma(STR, "name");
+  sma(ARRAY, "coords");
+  sma(ARRAY, "inventory");
+
+#define smg(t, f) t f = *(t *)serde_map_get(map, MSGPACK_OBJECT_POSITIVE_INTEGER, #f);
+
+  smg(uint32_t, lp);
+  smg(uint32_t, starting_lp);
+  smg(uint32_t, mental_health);
+  smg(uint32_t, starting_mental_health);
+  smg(uint32_t, hunger);
+  smg(uint32_t, thirst);
+  smg(uint32_t, tiredness);
+  smg(uint32_t, xp);
+  smg(uint32_t, current_level);
+  smg(uint32_t, hearing_distance);
+  smg(uint32_t, seeing_distance);
+  smg(EntityType, type);
 
   msgpack_object_array const *coords_array = serde_map_get(map, MSGPACK_OBJECT_ARRAY, "coords");
   assert(coords_array->size == 2);
@@ -84,9 +214,22 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   Point *coords = point_new(coords_array->ptr[0].via.u64, coords_array->ptr[1].via.u64);
 
   Entity *entity = calloc(1, sizeof(Entity));
-  entity->_starting_lp = starting_lp;
-  entity->_type = type;
-  entity->_lp = current_lp;
+
+#define assign(t) entity->_##t = t
+
+  assign(lp);
+  assign(starting_lp);
+  assign(mental_health);
+  assign(starting_mental_health);
+  assign(hunger);
+  assign(thirst);
+  assign(tiredness);
+  assign(xp);
+  assign(current_level);
+  assign(hearing_distance);
+  assign(seeing_distance);
+  assign(type);
+
   entity->_coords = coords;
 
   msgpack_object_str const *name_ptr = serde_map_get(map, MSGPACK_OBJECT_STR, "name");
@@ -105,28 +248,28 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   return entity;
 }
 
-void entity_free(Entity *entity) {
-  free(entity->_name);
-  point_free(entity->_coords);
-  entity_inventory_clear(entity);
-  free(entity->_inventory);
-  free(entity);
-}
-
 void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
   msgpack_packer packer;
   msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
 
-  msgpack_pack_map(&packer, 6);
+  msgpack_pack_map(&packer, 15);
 
-  serde_pack_str(&packer, "current_lp");
-  msgpack_pack_uint64(&packer, ent->_lp);
+#define PACK_UINT(t, s)        \
+  serde_pack_str(&packer, #t); \
+  msgpack_pack_uint##s(&packer, ent->_##t);
 
-  serde_pack_str(&packer, "starting_lp");
-  msgpack_pack_uint64(&packer, ent->_starting_lp);
-
-  serde_pack_str(&packer, "type");
-  msgpack_pack_uint8(&packer, ent->_type);
+  PACK_UINT(lp, 32);
+  PACK_UINT(starting_lp, 32);
+  PACK_UINT(mental_health, 32);
+  PACK_UINT(starting_mental_health, 32);
+  PACK_UINT(hunger, 32);
+  PACK_UINT(thirst, 32);
+  PACK_UINT(tiredness, 32);
+  PACK_UINT(xp, 32);
+  PACK_UINT(current_level, 32);
+  PACK_UINT(hearing_distance, 32);
+  PACK_UINT(seeing_distance, 32);
+  PACK_UINT(type, 8);
 
   serde_pack_str(&packer, "name");
   serde_pack_str(&packer, ent->_name);
@@ -144,6 +287,14 @@ void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
   }
 }
 
+void entity_free(Entity *entity) {
+  free(entity->_name);
+  point_free(entity->_coords);
+  entity_inventory_clear(entity);
+  free(entity->_inventory);
+  free(entity);
+}
+
 inline uint32_t entity_get_life_points(Entity const *entity) {
   return entity->_lp;
 }
@@ -152,7 +303,43 @@ inline uint32_t entity_get_starting_life_points(Entity const *entity) {
   return entity->_starting_lp;
 }
 
-EntityType entity_get_entity_type(Entity const *entity) {
+inline uint32_t entity_get_mental_health(Entity const *entity) {
+  return entity->_mental_health;
+}
+
+inline uint32_t entity_get_starting_mental_health(Entity const *entity) {
+  return entity->_starting_mental_health;
+}
+
+inline uint32_t entity_get_hunger(Entity const *entity) {
+  return entity->_hunger;
+}
+
+inline uint32_t entity_get_thirst(Entity const *entity) {
+  return entity->_thirst;
+}
+
+inline uint32_t entity_get_tiredness(Entity const *entity) {
+  return entity->_tiredness;
+}
+
+inline uint32_t entity_get_xp(Entity const *entity) {
+  return entity->_xp;
+}
+
+inline uint32_t entity_get_current_level(Entity const *entity) {
+  return entity->_current_level;
+}
+
+inline uint32_t entity_get_hearing_distance(Entity const *entity) {
+  return entity->_hearing_distance;
+}
+
+inline uint32_t entity_get_seeing_distance(Entity const *entity) {
+  return entity->_seeing_distance;
+}
+
+inline EntityType entity_get_entity_type(Entity const *entity) {
   return entity->_type;
 }
 
@@ -160,7 +347,7 @@ inline const char *entity_get_name(Entity const *entity) {
   return entity->_name;
 }
 
-Point const *entity_get_coords(Entity const *entity) {
+inline Point const *entity_get_coords(Entity const *entity) {
   return entity->_coords;
 }
 
@@ -174,6 +361,7 @@ bool entity_can_move(Entity const *ent) {
       break;
     case TREE:
     case MOUNTAIN:
+    case WATER:
       ret = false;
       break;
   }
@@ -181,11 +369,11 @@ bool entity_can_move(Entity const *ent) {
   return ret && entity_is_alive(ent);
 }
 
-bool entity_is_alive(Entity const *entity) {
+inline bool entity_is_alive(Entity const *entity) {
   return entity->_lp > 0;
 }
 
-bool entity_is_dead(Entity const *entity) {
+inline bool entity_is_dead(Entity const *entity) {
   return !entity_is_alive(entity);
 }
 
