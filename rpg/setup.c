@@ -43,37 +43,37 @@ Engine *init_game(Configuration *configuration) {
 
   // The player
   engine_add_entity(
-    engine, entity_new(configuration_get_player_starting_hp(configuration), HUMAN, configuration_get_player_name(configuration), 0, 0));
+    engine, entity_build(configuration_get_player_starting_hp(configuration), HUMAN, configuration_get_player_name(configuration), 0, 0));
 
   // The enemy
-  engine_add_entity(engine, entity_new(20, INHUMAN, "v1", 0, 7));
+  engine_add_entity(engine, entity_build(20, INHUMAN, "v1", 0, 7));
 
   // A small forest
-  engine_add_entity(engine, entity_new(15, TREE, "t1", 7, 0));
-  engine_add_entity(engine, entity_new(15, TREE, "t2", 8, 0));
-  engine_add_entity(engine, entity_new(15, TREE, "t3", 9, 0));
+  engine_add_entity(engine, entity_build(15, TREE, "t1", 7, 0));
+  engine_add_entity(engine, entity_build(15, TREE, "t2", 8, 0));
+  engine_add_entity(engine, entity_build(15, TREE, "t3", 9, 0));
 
   // Mountains
-  engine_add_entity(engine, entity_new(30, MOUNTAIN, "m1", 0, 2));
-  engine_add_entity(engine, entity_new(30, MOUNTAIN, "m2", 1, 2));
-  engine_add_entity(engine, entity_new(30, MOUNTAIN, "m3", 2, 2));
-  engine_add_entity(engine, entity_new(30, MOUNTAIN, "m4", 3, 2));
-  engine_add_entity(engine, entity_new(30, MOUNTAIN, "m5", 4, 2));
+  engine_add_entity(engine, entity_build(30, MOUNTAIN, "m1", 0, 2));
+  engine_add_entity(engine, entity_build(30, MOUNTAIN, "m2", 1, 2));
+  engine_add_entity(engine, entity_build(30, MOUNTAIN, "m3", 2, 2));
+  engine_add_entity(engine, entity_build(30, MOUNTAIN, "m4", 3, 2));
+  engine_add_entity(engine, entity_build(30, MOUNTAIN, "m5", 4, 2));
 
-  engine_add_entity(engine, entity_new(30, MOUNTAIN, "m6", 1, 3));
-  engine_add_entity(engine, entity_new(30, MOUNTAIN, "m7", 2, 3));
-  engine_add_entity(engine, entity_new(30, MOUNTAIN, "m8", 3, 3));
+  engine_add_entity(engine, entity_build(30, MOUNTAIN, "m6", 1, 3));
+  engine_add_entity(engine, entity_build(30, MOUNTAIN, "m7", 2, 3));
+  engine_add_entity(engine, entity_build(30, MOUNTAIN, "m8", 3, 3));
 
   // A bigger forest
-  engine_add_entity(engine, entity_new(30, TREE, "t4", 5, 6));
-  engine_add_entity(engine, entity_new(30, TREE, "t5", 6, 6));
-  engine_add_entity(engine, entity_new(30, TREE, "t6", 7, 6));
-  engine_add_entity(engine, entity_new(30, TREE, "t7", 5, 7));
-  engine_add_entity(engine, entity_new(30, TREE, "t8", 7, 7));
-  engine_add_entity(engine, entity_new(30, TREE, "t9", 7, 8));
+  engine_add_entity(engine, entity_build(30, TREE, "t4", 5, 6));
+  engine_add_entity(engine, entity_build(30, TREE, "t5", 6, 6));
+  engine_add_entity(engine, entity_build(30, TREE, "t6", 7, 6));
+  engine_add_entity(engine, entity_build(30, TREE, "t7", 5, 7));
+  engine_add_entity(engine, entity_build(30, TREE, "t8", 7, 7));
+  engine_add_entity(engine, entity_build(30, TREE, "t9", 7, 8));
 
   // An animal
-  engine_add_entity(engine, entity_new(30, ANIMAL, "a1", 6, 7));
+  engine_add_entity(engine, entity_build(30, ANIMAL, "a1", 6, 7));
 
   engine_set_active_entity(engine, configuration_get_player_name(configuration));
 

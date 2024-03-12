@@ -26,7 +26,7 @@ void engine_creation_test(void) {
 void engine_entities_test(void) {
   Map    *map = map_new(20, 20, 10, "Some map");
   Engine *engine = engine_new(map);
-  engine_add_entity(engine, entity_new(30, HUMAN, "e1", 0, 0));
+  engine_add_entity(engine, entity_build(30, HUMAN, "e1", 0, 0));
 
   CU_ASSERT_EQUAL(map_count_entities(map), 1);
   CU_ASSERT_TRUE(map_contains_entity(map, "e1"));
@@ -47,14 +47,14 @@ void engine_entities_test(void) {
 
 void engine_close_entities_test(void) {
   Engine *engine = engine_new(map_new(20, 20, 8, "Some map"));
-  engine_add_entity(engine, entity_new(10, INHUMAN, "z1", 0, 1));
-  engine_add_entity(engine, entity_new(10, HUMAN, "h1", 1, 1));
-  engine_add_entity(engine, entity_new(10, INHUMAN, "z2", 2, 1));
-  engine_add_entity(engine, entity_new(10, INHUMAN, "z3", 1, 0));
+  engine_add_entity(engine, entity_build(10, INHUMAN, "z1", 0, 1));
+  engine_add_entity(engine, entity_build(10, HUMAN, "h1", 1, 1));
+  engine_add_entity(engine, entity_build(10, INHUMAN, "z2", 2, 1));
+  engine_add_entity(engine, entity_build(10, INHUMAN, "z3", 1, 0));
   engine_set_active_entity(engine, "h1");
 
   // This entity is far from the active one
-  engine_add_entity(engine, entity_new(10, HUMAN, "far away", 4, 0));
+  engine_add_entity(engine, entity_build(10, HUMAN, "far away", 4, 0));
 
   ssize_t  size;
   Entity **close_entities = engine_get_close_entities(engine, &size);
@@ -71,14 +71,14 @@ void engine_close_entities_test(void) {
 
 void engine_keypress_test(void) {
   Engine *engine = engine_new(map_new(5, 5, 10, "Some map"));
-  Entity *active = entity_new(30, ANIMAL, "e4", 3, 0);
-  engine_add_entity(engine, entity_new(30, HUMAN, "e1", 0, 0));
-  engine_add_entity(engine, entity_new(30, ANIMAL, "e2", 1, 0));
-  engine_add_entity(engine, entity_new(30, INHUMAN, "e3", 2, 0));
+  Entity *active = entity_build(30, ANIMAL, "e4", 3, 0);
+  engine_add_entity(engine, entity_build(30, HUMAN, "e1", 0, 0));
+  engine_add_entity(engine, entity_build(30, ANIMAL, "e2", 1, 0));
+  engine_add_entity(engine, entity_build(30, INHUMAN, "e3", 2, 0));
   engine_add_entity(engine, active);
-  engine_add_entity(engine, entity_new(30, TREE, "e5", 0, 1));
-  engine_add_entity(engine, entity_new(30, MOUNTAIN, "e6", 1, 1));
-  engine_add_entity(engine, entity_new(30, HUMAN, "e7", 2, 1));
+  engine_add_entity(engine, entity_build(30, TREE, "e5", 0, 1));
+  engine_add_entity(engine, entity_build(30, MOUNTAIN, "e6", 1, 1));
+  engine_add_entity(engine, entity_build(30, HUMAN, "e7", 2, 1));
 
   /*
     @#&#.
@@ -207,17 +207,17 @@ void engine_keypress_test(void) {
 void engine_attack_test(void) {
   Engine *engine = engine_new(map_new(20, 20, 10, "Some map"));
   // These two entities are close, they can attack each other
-  Entity *human1 = entity_new(10, HUMAN, "h1", 10, 10);
-  Entity *zombie = entity_new(8, INHUMAN, "z1", 9, 11);
+  Entity *human1 = entity_build(10, HUMAN, "h1", 10, 10);
+  Entity *zombie = entity_build(8, INHUMAN, "z1", 9, 11);
   engine_add_entity(engine, human1);
   engine_add_entity(engine, zombie);
 
   // This entity is close to "z1" but not to "h1"
-  Entity *human2 = entity_new(6, HUMAN, "h2", 8, 11);
+  Entity *human2 = entity_build(6, HUMAN, "h2", 8, 11);
   engine_add_entity(engine, human2);
 
   // This entity is far from everything
-  Entity *human3 = entity_new(15, HUMAN, "h3", 12, 11);
+  Entity *human3 = entity_build(15, HUMAN, "h3", 12, 11);
   engine_add_entity(engine, human3);
 
   // Successful attack
@@ -257,7 +257,7 @@ void engine_serialize_test(void) {
   msgpack_sbuffer_init(&buffer);
 
   Engine *engine = engine_new(map_new(20, 20, 10, "Some map"));
-  map_add_entity(engine_get_map(engine), entity_new(30, HUMAN, "Active player", 0, 0));
+  map_add_entity(engine_get_map(engine), entity_build(30, HUMAN, "Active player", 0, 0));
   engine_set_active_entity(engine, "Active player");
 
   // Simulate some cycles
@@ -376,7 +376,7 @@ void engine_serialize_test(void) {
 
 void engine_deserialize_test(void) {
   Engine *engine = engine_new(map_new(20, 20, 10, "Some map"));
-  map_add_entity(engine_get_map(engine), entity_new(30, HUMAN, "Active player", 0, 0));
+  map_add_entity(engine_get_map(engine), entity_build(30, HUMAN, "Active player", 0, 0));
   engine_set_active_entity(engine, "Active player");
 
   msgpack_sbuffer sbuffer;

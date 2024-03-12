@@ -38,9 +38,10 @@ void player_window_draw_inner(PlayerWindow *plw) {
   WINDOW *target = boxed_window_get_inner_window(plw->_window);
   wclear(target);
   mvwprintw(target, 0, 0, "HP: %d/%d", entity_get_life_points(plw->_entity), entity_get_starting_life_points(plw->_entity));
-  mvwprintw(target, 1, 0, "XP: 0/1000");
-  mvwprintw(target, 2, 0, "LV: 0");
-  mvwprintw(target, 3, 0, "Perks: No active perks");
+  mvwprintw(target, 1, 0, "MH: %d/%d", entity_get_mental_health(plw->_entity), entity_get_starting_mental_health(plw->_entity));
+  mvwprintw(target, 2, 0, "XP: %d/1000", entity_get_xp(plw->_entity));
+  mvwprintw(target, 3, 0, "LV: %d", entity_get_current_level(plw->_entity));
+  mvwprintw(target, 4, 0, "Perks: No active perks");
   wnoutrefresh(target);
 }
 

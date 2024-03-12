@@ -1,6 +1,7 @@
 #include "configuration.h"
 #include "debug_window.h"
 #include "engine.h"
+#include "entity.h"
 #include "game_message_window.h"
 #include "inventory_window.h"
 #include "logger.h"
@@ -82,6 +83,18 @@ int main(int argc, char *argv[]) {
       case 's':
         game_message_window_show_message(message_window, "Hey, that's an S!");
         break;
+      case 'w':
+        game_message_window_show_message(message_window, "Resetting hunger");
+        entity_set_hunger(engine_get_active_entity(engine), 0);
+        break;
+      case 'e':
+        game_message_window_show_message(message_window, "Resetting thirst");
+        entity_set_thirst(engine_get_active_entity(engine), 0);
+        break;
+      case 'r':
+        game_message_window_show_message(message_window, "Resetting tiredness");
+        entity_set_tiredness(engine_get_active_entity(engine), 0);
+        break;
       case 'd':
         {
           if (debug_window_is_visible(debug_window)) {
@@ -96,6 +109,11 @@ int main(int argc, char *argv[]) {
       default:
         engine_handle_keypress(engine, key);
         engine_move_all_entities(engine);
+
+        // Each tick makes the player hungry!
+        entity_increment_hunger(engine_get_active_entity(engine));
+        entity_increment_thirst(engine_get_active_entity(engine));
+        entity_increment_tiredness(engine_get_active_entity(engine));
         break;
     }
 

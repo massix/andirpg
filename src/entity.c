@@ -32,7 +32,18 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/cdefs.h>
 #include <sys/types.h>
+
+#define GENERATE_SETTER(prop_name)                                 \
+  inline void entity_set_##prop_name(Entity *self, uint32_t val) { \
+    self->_##prop_name = val;                                      \
+  }
+
+#define GENERATE_GETTER(rtype, prop_name)                   \
+  inline rtype entity_get_##prop_name(Entity const *self) { \
+    return self->_##prop_name;                              \
+  }
 
 // This can be a compile-time constant?
 #ifndef MAX_INVENTORY_SIZE
@@ -42,41 +53,213 @@
 struct Entity {
   uint32_t   _lp;
   uint32_t   _starting_lp;
+  uint32_t   _mental_health;
+  uint32_t   _starting_mental_health;
+  uint32_t   _hunger;
+  uint32_t   _thirst;
+  uint32_t   _tiredness;
+  uint32_t   _xp;
+  uint32_t   _current_level;
+  uint32_t   _hearing_distance;
+  uint32_t   _seeing_distance;
   EntityType _type;
   char      *_name;
   Point     *_coords;
   Item     **_inventory;
 };
 
-Entity *entity_new(uint32_t starting_lp, EntityType type, const char *name, uint32_t start_x, uint32_t start_y) {
-  LOG_DEBUG("Creating new entity '%s'", name);
+EntityBuilder *eb_with_type(EntityBuilder *self, EntityType type) {
+  self->type = type;
+  return self;
+}
 
-  Entity *ret = calloc(1, sizeof(Entity));
-  ret->_lp = starting_lp > 0 ? starting_lp : 1;
-  ret->_starting_lp = ret->_lp;
-  ret->_type = type;
-  ret->_name = strdup(name);
-  ret->_inventory = calloc(1, sizeof(Item *));
-  ret->_inventory[0] = nullptr;
-  ret->_coords = point_new(start_x, start_y);
-  return ret;
+EntityBuilder *eb_with_lp(EntityBuilder *self, uint32_t life_points) {
+  self->life_points = life_points;
+  return self;
+}
+
+EntityBuilder *eb_with_mh(EntityBuilder *self, uint32_t mental_health) {
+  self->mental_health = mental_health;
+  return self;
+}
+
+EntityBuilder *eb_with_level(EntityBuilder *self, uint32_t level) {
+  self->level = level;
+  return self;
+}
+
+EntityBuilder *eb_with_xp(EntityBuilder *self, uint32_t xp) {
+  self->xp = xp;
+  return self;
+}
+
+EntityBuilder *eb_with_hd(EntityBuilder *self, uint32_t hearing_distance) {
+  self->hearing_distance = hearing_distance;
+  return self;
+}
+
+EntityBuilder *eb_with_seeing_distance(EntityBuilder *self, uint32_t seeing_distance) {
+  self->seeing_distance = seeing_distance;
+  return self;
+}
+
+EntityBuilder *eb_with_name(EntityBuilder *self, char const *name) {
+  if (self->name != nullptr) {
+    free(self->name);
+  }
+
+  self->name = strdup(name);
+  return self;
+}
+
+EntityBuilder *eb_with_coords(EntityBuilder *self, uint32_t x, uint32_t y) {
+  self->x = x;
+  self->y = y;
+  return self;
+}
+
+EntityBuilder *eb_with_hunger(EntityBuilder *self, uint32_t hunger) {
+  self->hunger = hunger;
+  return self;
+}
+
+EntityBuilder *eb_with_thirst(EntityBuilder *self, uint32_t thirst) {
+  self->thirst = thirst;
+  return self;
+}
+
+EntityBuilder *eb_with_tiredness(EntityBuilder *self, uint32_t tiredness) {
+  self->tiredness = tiredness;
+  return self;
+}
+
+Entity *eb_build(EntityBuilder *self, bool oneshot) {
+  if (self->name == nullptr) {
+    panic("Cannot build an entity without a name!", EC_ENTITY_EMPTY_NAME);
+  }
+
+  Entity *ent = calloc(1, sizeof(Entity));
+  ent->_lp = self->life_points;
+  ent->_starting_lp = self->life_points;
+  ent->_mental_health = self->mental_health;
+  ent->_starting_mental_health = self->mental_health;
+  ent->_hunger = self->hunger;
+  ent->_thirst = self->thirst;
+  ent->_tiredness = self->tiredness;
+  ent->_xp = self->xp;
+  ent->_current_level = self->level;
+  ent->_hearing_distance = self->hearing_distance;
+  ent->_seeing_distance = self->seeing_distance;
+  ent->_type = self->type;
+  ent->_name = strdup(self->name);
+  ent->_coords = point_new(self->x, self->y);
+  ent->_inventory = calloc(1, sizeof(Item *));
+  ent->_inventory[0] = nullptr;
+
+  if (oneshot) {
+    entity_builder_free(self);
+  }
+
+  return ent;
+}
+
+// Builder for entities
+EntityBuilder *entity_builder_new() {
+  EntityBuilder *builder = calloc(1, sizeof(EntityBuilder));
+
+  // Init with some default values
+  builder->name = nullptr;
+  builder->type = INHUMAN;
+  builder->life_points = 30;
+  builder->mental_health = 30;
+  builder->level = 0;
+  builder->xp = 0;
+  builder->hearing_distance = 10;
+  builder->seeing_distance = 10;
+  builder->x = 0;
+  builder->y = 0;
+  builder->hunger = 0;
+  builder->thirst = 0;
+  builder->tiredness = 0;
+
+  // Methods
+  builder->with_type = &eb_with_type;
+  builder->with_life_points = &eb_with_lp;
+  builder->with_mental_health = &eb_with_mh;
+  builder->with_level = &eb_with_level;
+  builder->with_xp = &eb_with_xp;
+  builder->with_hearing_distance = &eb_with_hd;
+  builder->with_seeing_distance = &eb_with_seeing_distance;
+  builder->with_name = &eb_with_name;
+  builder->with_coords = &eb_with_coords;
+  builder->with_hunger = &eb_with_hunger;
+  builder->with_thirst = &eb_with_thirst;
+  builder->with_tiredness = &eb_with_tiredness;
+  builder->build = &eb_build;
+
+  return builder;
+}
+
+void entity_builder_free(EntityBuilder *self) {
+  free(self->name);
+  free(self);
+}
+
+Entity *entity_new(uint32_t starting_lp, EntityType type, const char *name, uint32_t start_x, uint32_t start_y) {
+  LOG_ERROR("Trying to create an entity using old constructor", 0);
+  panic("entity_new() is deprecated, please use entity_build() with the same parameters", EC_DEPRECATED_FUNCTION);
+
+  return nullptr; // Should never arrive here
+}
+
+Entity *entity_build(uint32_t starting_lp, EntityType type, const char *name, uint32_t start_x, uint32_t start_y) {
+  EntityBuilder *builder = entity_builder_new();
+  return builder->with_life_points(builder, starting_lp)
+    ->with_type(builder, type)
+    ->with_name(builder, name)
+    ->with_coords(builder, start_x, start_y)
+    ->build(builder, true);
 }
 
 Entity *entity_deserialize(msgpack_object_map const *map) {
   LOG_INFO("Unmarshalling entity", 0);
   LOG_INFO("Validating map", 0);
 
-  assert(map->size == 6);
-  serde_map_assert(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "current_lp");
-  serde_map_assert(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "starting_lp");
-  serde_map_assert(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "type");
-  serde_map_assert(map, MSGPACK_OBJECT_STR, "name");
-  serde_map_assert(map, MSGPACK_OBJECT_ARRAY, "coords");
-  serde_map_assert(map, MSGPACK_OBJECT_ARRAY, "inventory");
+  assert(map->size == 15);
 
-  uint32_t   current_lp = *(uint32_t *)serde_map_get(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "current_lp");
-  uint32_t   starting_lp = *(uint32_t *)serde_map_get(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "starting_lp");
-  EntityType type = *(EntityType *)serde_map_get(map, MSGPACK_OBJECT_POSITIVE_INTEGER, "type");
+#define sma(t, f) serde_map_assert(map, MSGPACK_OBJECT_##t, f);
+
+  sma(POSITIVE_INTEGER, "lp");
+  sma(POSITIVE_INTEGER, "starting_lp");
+  sma(POSITIVE_INTEGER, "mental_health");
+  sma(POSITIVE_INTEGER, "starting_mental_health");
+  sma(POSITIVE_INTEGER, "hunger");
+  sma(POSITIVE_INTEGER, "thirst");
+  sma(POSITIVE_INTEGER, "tiredness");
+  sma(POSITIVE_INTEGER, "xp");
+  sma(POSITIVE_INTEGER, "current_level");
+  sma(POSITIVE_INTEGER, "hearing_distance");
+  sma(POSITIVE_INTEGER, "seeing_distance");
+  sma(POSITIVE_INTEGER, "type");
+  sma(STR, "name");
+  sma(ARRAY, "coords");
+  sma(ARRAY, "inventory");
+
+#define smg(t, f) t f = *(t *)serde_map_get(map, MSGPACK_OBJECT_POSITIVE_INTEGER, #f);
+
+  // NOLINTNEXTLINE(readability-identifier-length)
+  smg(uint32_t, lp);
+  smg(uint32_t, starting_lp);
+  smg(uint32_t, mental_health);
+  smg(uint32_t, starting_mental_health);
+  smg(uint32_t, hunger);
+  smg(uint32_t, thirst);
+  smg(uint32_t, tiredness);
+  smg(uint32_t, xp);
+  smg(uint32_t, current_level);
+  smg(uint32_t, hearing_distance);
+  smg(uint32_t, seeing_distance);
+  smg(EntityType, type);
 
   msgpack_object_array const *coords_array = serde_map_get(map, MSGPACK_OBJECT_ARRAY, "coords");
   assert(coords_array->size == 2);
@@ -84,9 +267,22 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   Point *coords = point_new(coords_array->ptr[0].via.u64, coords_array->ptr[1].via.u64);
 
   Entity *entity = calloc(1, sizeof(Entity));
-  entity->_starting_lp = starting_lp;
-  entity->_type = type;
-  entity->_lp = current_lp;
+
+#define assign(t) entity->_##t = t
+
+  assign(lp);
+  assign(starting_lp);
+  assign(mental_health);
+  assign(starting_mental_health);
+  assign(hunger);
+  assign(thirst);
+  assign(tiredness);
+  assign(xp);
+  assign(current_level);
+  assign(hearing_distance);
+  assign(seeing_distance);
+  assign(type);
+
   entity->_coords = coords;
 
   msgpack_object_str const *name_ptr = serde_map_get(map, MSGPACK_OBJECT_STR, "name");
@@ -105,28 +301,28 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   return entity;
 }
 
-void entity_free(Entity *entity) {
-  free(entity->_name);
-  point_free(entity->_coords);
-  entity_inventory_clear(entity);
-  free(entity->_inventory);
-  free(entity);
-}
-
 void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
   msgpack_packer packer;
   msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
 
-  msgpack_pack_map(&packer, 6);
+  msgpack_pack_map(&packer, 15);
 
-  serde_pack_str(&packer, "current_lp");
-  msgpack_pack_uint64(&packer, ent->_lp);
+#define PACK_UINT(t, s)        \
+  serde_pack_str(&packer, #t); \
+  msgpack_pack_uint##s(&packer, ent->_##t);
 
-  serde_pack_str(&packer, "starting_lp");
-  msgpack_pack_uint64(&packer, ent->_starting_lp);
-
-  serde_pack_str(&packer, "type");
-  msgpack_pack_uint8(&packer, ent->_type);
+  PACK_UINT(lp, 32);
+  PACK_UINT(starting_lp, 32);
+  PACK_UINT(mental_health, 32);
+  PACK_UINT(starting_mental_health, 32);
+  PACK_UINT(hunger, 32);
+  PACK_UINT(thirst, 32);
+  PACK_UINT(tiredness, 32);
+  PACK_UINT(xp, 32);
+  PACK_UINT(current_level, 32);
+  PACK_UINT(hearing_distance, 32);
+  PACK_UINT(seeing_distance, 32);
+  PACK_UINT(type, 8);
 
   serde_pack_str(&packer, "name");
   serde_pack_str(&packer, ent->_name);
@@ -144,6 +340,14 @@ void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
   }
 }
 
+void entity_free(Entity *entity) {
+  free(entity->_name);
+  point_free(entity->_coords);
+  entity_inventory_clear(entity);
+  free(entity->_inventory);
+  free(entity);
+}
+
 inline uint32_t entity_get_life_points(Entity const *entity) {
   return entity->_lp;
 }
@@ -152,17 +356,22 @@ inline uint32_t entity_get_starting_life_points(Entity const *entity) {
   return entity->_starting_lp;
 }
 
-EntityType entity_get_entity_type(Entity const *entity) {
+GENERATE_GETTER(uint32_t, mental_health);
+GENERATE_GETTER(uint32_t, starting_mental_health);
+GENERATE_GETTER(uint32_t, hunger);
+GENERATE_GETTER(uint32_t, thirst);
+GENERATE_GETTER(uint32_t, tiredness);
+GENERATE_GETTER(uint32_t, xp);
+GENERATE_GETTER(uint32_t, current_level);
+GENERATE_GETTER(uint32_t, hearing_distance);
+GENERATE_GETTER(uint32_t, seeing_distance);
+
+inline EntityType entity_get_entity_type(Entity const *entity) {
   return entity->_type;
 }
 
-inline const char *entity_get_name(Entity const *entity) {
-  return entity->_name;
-}
-
-Point const *entity_get_coords(Entity const *entity) {
-  return entity->_coords;
-}
+GENERATE_GETTER(char const *, name);
+GENERATE_GETTER(Point const *, coords);
 
 bool entity_can_move(Entity const *ent) {
   bool ret = true;
@@ -174,6 +383,7 @@ bool entity_can_move(Entity const *ent) {
       break;
     case TREE:
     case MOUNTAIN:
+    case WATER:
       ret = false;
       break;
   }
@@ -181,12 +391,20 @@ bool entity_can_move(Entity const *ent) {
   return ret && entity_is_alive(ent);
 }
 
-bool entity_is_alive(Entity const *entity) {
+inline bool entity_is_alive(Entity const *entity) {
   return entity->_lp > 0;
 }
 
-bool entity_is_dead(Entity const *entity) {
+inline bool entity_is_dead(Entity const *entity) {
   return !entity_is_alive(entity);
+}
+
+inline bool entity_is_sane(Entity const *entity) {
+  return entity->_mental_health > 0;
+}
+
+inline bool entity_is_crazy(Entity const *entity) {
+  return !entity_is_sane(entity);
 }
 
 void entity_move(Entity *entity, uint32_t delta_x, uint32_t delta_y) {
@@ -204,9 +422,24 @@ void entity_hurt(Entity *entity, uint32_t life_points) {
   }
 }
 
+void entity_mental_hurt(Entity *entity, uint32_t mental_damage) {
+  if (mental_damage > entity->_mental_health) {
+    entity->_mental_health = 0;
+  } else {
+    entity->_mental_health = entity->_mental_health - mental_damage;
+  }
+}
+
 void entity_heal(Entity *entity, uint32_t life_points) {
   if (entity->_lp > 0) {
     entity->_lp = min(entity->_starting_lp, entity->_lp + life_points);
+  }
+}
+
+void entity_mental_heal(Entity *entity, uint32_t mental_heal) {
+  entity->_mental_health += mental_heal;
+  if (entity->_mental_health > entity->_starting_mental_health) {
+    entity->_mental_health = entity->_starting_mental_health;
   }
 }
 
@@ -216,6 +449,24 @@ void entity_resurrect(Entity *entity) {
     entity->_lp = entity->_starting_lp;
   }
 }
+
+void entity_increment_hunger(Entity *entity) {
+  entity->_hunger++;
+}
+
+void entity_increment_thirst(Entity *entity) {
+  entity->_thirst++;
+}
+
+void entity_increment_tiredness(Entity *entity) {
+  entity->_tiredness++;
+}
+
+GENERATE_SETTER(hunger);
+GENERATE_SETTER(thirst);
+GENERATE_SETTER(tiredness);
+GENERATE_SETTER(xp);
+GENERATE_SETTER(current_level);
 
 size_t entity_inventory_count(Entity const *entity) {
   size_t count = 0;

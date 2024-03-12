@@ -37,17 +37,17 @@ bool filter_zombies(Entity const *entity) {
 
 void map_entities_test(void) {
   Map *map = map_new(20, 20, 15, "MapName");
-  map_add_entity(map, entity_new(30, INHUMAN, "e1", 10, 10));
-  map_add_entity(map, entity_new(15, ANIMAL, "e2", 10, 12));
-  map_add_entity(map, entity_new(15, HUMAN, "e3", 9, 12));
-  map_add_entity(map, entity_new(20, INHUMAN, "e4", 11, 11));
+  map_add_entity(map, entity_build(30, INHUMAN, "e1", 10, 10));
+  map_add_entity(map, entity_build(15, ANIMAL, "e2", 10, 12));
+  map_add_entity(map, entity_build(15, HUMAN, "e3", 9, 12));
+  map_add_entity(map, entity_build(20, INHUMAN, "e4", 11, 11));
 
   Entity    **all = map_get_all_entities(map);
   const char *name = entity_get_name(all[0]);
   CU_ASSERT_TRUE(strings_equal(name, "e1"));
 
   // This should fail as tile is already occupied
-  map_add_entity(map, entity_new(10, INHUMAN, "e5", 11, 11));
+  map_add_entity(map, entity_build(10, INHUMAN, "e5", 11, 11));
 
   CU_ASSERT_EQUAL(map_count_entities(map), 4);
 
@@ -79,7 +79,7 @@ void map_entities_test(void) {
   CU_ASSERT_EQUAL(map_count_entities(map), 3);
 
   // Now I can reuse the tile
-  map_add_entity(map, entity_new(10, HUMAN, "e5", 10, 12));
+  map_add_entity(map, entity_build(10, HUMAN, "e5", 10, 12));
   CU_ASSERT_EQUAL(map_count_entities(map), 4);
 
   ssize_t  nb_results;
@@ -131,8 +131,8 @@ void check_msgpack_key(msgpack_object *obj, const char *key) {
 
 Map *create_serde_map() {
   Map *map = map_new(42, 23, 15, "Serde serializable map");
-  map_add_entity(map, entity_new(30, HUMAN, "E1", 12, 0));
-  map_add_entity(map, entity_new(15, INHUMAN, "E2", 13, 1));
+  map_add_entity(map, entity_build(30, HUMAN, "E1", 12, 0));
+  map_add_entity(map, entity_build(15, INHUMAN, "E2", 13, 1));
 
   // I don't care about the items themselves
   map_add_item(map, armor_new("An armor", 30, 15, 16, 3, 3), 10, 1);

@@ -1,5 +1,6 @@
 #include "item.h"
 #include "point.h"
+#include "serde.h"
 #include "utils.h"
 #include <CUnit/CUError.h>
 #include <CUnit/CUnit.h>
@@ -9,6 +10,7 @@
 #include <msgpack/object.h>
 #include <msgpack/sbuffer.h>
 #include <msgpack/unpack.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,7 +24,7 @@
   }
 
 void entity_creation_test(void) {
-  Entity *human = entity_new(30, HUMAN, "Avatar", 20, 30);
+  Entity *human = entity_build(30, HUMAN, "Avatar", 20, 30);
 
   CU_ASSERT_TRUE(strings_equal(entity_get_name(human), "Avatar"));
   CU_ASSERT_EQUAL(entity_get_entity_type(human), HUMAN);
@@ -33,11 +35,32 @@ void entity_creation_test(void) {
   CU_ASSERT_EQUAL(point_get_x(entity_coords), 20);
   CU_ASSERT_EQUAL(point_get_y(entity_coords), 30);
 
+  CU_ASSERT_EQUAL(entity_get_seeing_distance(human), 10);
+  CU_ASSERT_EQUAL(entity_get_hearing_distance(human), 10);
+
+#define test_get_set(prop, val)  \
+  entity_set_##prop(human, val); \
+  CU_ASSERT_EQUAL(entity_get_##prop(human), val);
+
+  test_get_set(xp, 42);
+  test_get_set(current_level, 10);
+  test_get_set(thirst, 5);
+  test_get_set(hunger, 42);
+  test_get_set(tiredness, 98);
+
+  entity_increment_hunger(human);
+  entity_increment_thirst(human);
+  entity_increment_tiredness(human);
+
+  CU_ASSERT_EQUAL(entity_get_hunger(human), 43);
+  CU_ASSERT_EQUAL(entity_get_thirst(human), 6);
+  CU_ASSERT_EQUAL(entity_get_tiredness(human), 99);
+
   entity_free(human);
 }
 
 void entity_lifepoints_test(void) {
-  Entity *monster = entity_new(15, INHUMAN, "Orc", 20, 20);
+  Entity *monster = entity_build(15, INHUMAN, "Orc", 20, 20);
   CU_ASSERT_EQUAL(entity_get_life_points(monster), 15);
 
   // Can hurt a creature
@@ -71,9 +94,36 @@ void entity_lifepoints_test(void) {
   entity_free(monster);
 }
 
+void entity_mental_health_test(void) {
+  EntityBuilder *builder = entity_builder_new();
+  Entity *sane = builder->with_type(builder, ANIMAL)->with_name(builder, "E1")->with_mental_health(builder, 500)->build(builder, true);
+
+  CU_ASSERT_EQUAL(entity_get_mental_health(sane), 500);
+  CU_ASSERT_TRUE(entity_is_sane(sane));
+
+  entity_mental_hurt(sane, 450);
+  CU_ASSERT_EQUAL(entity_get_mental_health(sane), 50);
+  CU_ASSERT_TRUE(entity_is_sane(sane));
+
+  entity_mental_hurt(sane, 80);
+  CU_ASSERT_EQUAL(entity_get_mental_health(sane), 0);
+  CU_ASSERT_FALSE(entity_is_sane(sane));
+  CU_ASSERT_TRUE(entity_is_crazy(sane));
+
+  entity_mental_heal(sane, 380);
+  CU_ASSERT_EQUAL(entity_get_mental_health(sane), 380);
+  CU_ASSERT_FALSE(entity_is_crazy(sane));
+
+  entity_mental_heal(sane, 200);
+  CU_ASSERT_EQUAL(entity_get_mental_health(sane), 500);
+  CU_ASSERT_FALSE(entity_is_crazy(sane));
+
+  entity_free(sane);
+}
+
 void entity_resurrect_test(void) {
-  Entity *human = entity_new(15, HUMAN, "human", 0, 0);
-  Entity *inhuman = entity_new(15, INHUMAN, "inhuman", 0, 0);
+  Entity *human = entity_build(15, HUMAN, "human", 0, 0);
+  Entity *inhuman = entity_build(15, INHUMAN, "inhuman", 0, 0);
   entity_hurt(human, 15);
   entity_hurt(inhuman, 15);
 
@@ -93,7 +143,7 @@ void entity_resurrect_test(void) {
 }
 
 void entity_move_test(void) {
-  Entity *dog = entity_new(30, ANIMAL, "Bounty", 46, -8);
+  Entity *dog = entity_build(30, ANIMAL, "Bounty", 46, -8);
   CU_ASSERT_TRUE(entity_can_move(dog));
 
   entity_move(dog, -4, 20);
@@ -101,13 +151,13 @@ void entity_move_test(void) {
   CU_ASSERT_EQUAL(point_get_x(entity_get_coords(dog)), 42);
   CU_ASSERT_EQUAL(point_get_y(entity_get_coords(dog)), 12);
 
-  Entity *tree = entity_new(1, TREE, "Ent", 20, 1);
+  Entity *tree = entity_build(1, TREE, "Ent", 20, 1);
   CU_ASSERT_FALSE(entity_can_move(tree));
   entity_move(tree, 10, 14);
   CU_ASSERT_EQUAL(point_get_x(entity_get_coords(tree)), 20);
   CU_ASSERT_EQUAL(point_get_y(entity_get_coords(tree)), 1);
 
-  Entity *mountain = entity_new(1, MOUNTAIN, "Fuji", 10, 14);
+  Entity *mountain = entity_build(1, MOUNTAIN, "Fuji", 10, 14);
   CU_ASSERT_FALSE(entity_can_move(mountain));
 
   // Dead entities cannot move
@@ -134,7 +184,7 @@ bool filter_none(Item const *) {
 }
 
 void entity_inventory_test(void) {
-  Entity *entity = entity_new(20, HUMAN, "An human", 0, 0);
+  Entity *entity = entity_build(20, HUMAN, "An human", 0, 0);
   CU_ASSERT_EQUAL(entity_inventory_count(entity), 0);
 
   entity_inventory_add_item(entity, weapon_new("Weapon number one", 30, 20, 1, 10, 10));
@@ -180,7 +230,7 @@ void entity_inventory_test(void) {
   entity_inventory_clear(entity);
   CU_ASSERT_EQUAL(entity_inventory_count(entity), 0);
 
-  Entity *empty_inventory = entity_new(10, TREE, "A tree", 0, 0);
+  Entity *empty_inventory = entity_build(10, TREE, "A tree", 0, 0);
   entity_inventory_remove_item(empty_inventory, "Not existing");
   CU_ASSERT_EQUAL(entity_inventory_count(empty_inventory), 0);
 
@@ -194,7 +244,7 @@ void entity_inventory_test(void) {
 void entity_serialization_test() {
   const char *filename = "./entity_serialization.bin";
 
-  Entity *entity = entity_new(30, HUMAN, "Some random name", 42, 23);
+  Entity *entity = entity_build(30, HUMAN, "Some random name", 42, 23);
   entity_inventory_add_item(entity, tool_new("Pickaxe", 30, 15, 2, 14));
   entity_inventory_add_item(entity, armor_new("An armor", 30, 16, 50, 30, 4));
   entity_inventory_add_item(entity, item_new(FORAGE, "A fruit", 10, 30));
@@ -241,29 +291,43 @@ void entity_serialization_test() {
   CU_ASSERT_EQUAL(msgpack_unpacker_next(&unpacker, &result), MSGPACK_UNPACK_SUCCESS);
 
   CU_ASSERT_EQUAL(result.data.type, MSGPACK_OBJECT_MAP);
-  CU_ASSERT_EQUAL(result.data.via.map.size, 6);
+  CU_ASSERT_EQUAL(result.data.via.map.size, 15);
 
-  CU_ASSERT_MAP_KEY(result.data.via.map.ptr[0], "current_lp");
-  CU_ASSERT_EQUAL(result.data.via.map.ptr[0].val.via.u64, 30 - 12);
+#define serde_map_assert_with_value(type, ctype, field, expected_value)                            \
+  {                                                                                                \
+    serde_map_assert(&result.data.via.map, MSGPACK_OBJECT_##type, #field);                         \
+    ctype from_map = *(ctype *)serde_map_get(&result.data.via.map, MSGPACK_OBJECT_##type, #field); \
+    CU_ASSERT_EQUAL(from_map, expected_value);                                                     \
+  }
 
-  CU_ASSERT_MAP_KEY(result.data.via.map.ptr[1], "starting_lp");
-  CU_ASSERT_EQUAL(result.data.via.map.ptr[1].val.via.u64, 30);
+  serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, lp, 30 - 12);
+  serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, starting_lp, 30);
+  serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, mental_health, 30);
+  serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, starting_mental_health, 30);
+  serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, hunger, 0);
+  serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, thirst, 0);
+  serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, tiredness, 0);
+  serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, xp, 0);
+  serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, current_level, 0);
+  serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, hearing_distance, 10);
+  serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, seeing_distance, 10);
+  serde_map_assert_with_value(POSITIVE_INTEGER, EntityType, type, HUMAN);
 
-  CU_ASSERT_MAP_KEY(result.data.via.map.ptr[2], "type");
-  CU_ASSERT_EQUAL(result.data.via.map.ptr[2].val.via.u64, HUMAN);
+  serde_map_assert(&result.data.via.map, MSGPACK_OBJECT_STR, "name");
+  serde_map_assert(&result.data.via.map, MSGPACK_OBJECT_ARRAY, "coords");
+  serde_map_assert(&result.data.via.map, MSGPACK_OBJECT_ARRAY, "inventory");
 
-  CU_ASSERT_MAP_KEY(result.data.via.map.ptr[3], "name");
-  CU_ASSERT_EQUAL(strncmp(result.data.via.map.ptr[3].val.via.str.ptr, "Some random name", result.data.via.map.ptr[3].val.via.str.size), 0);
+  msgpack_object_str const *name_str = serde_map_get(&result.data.via.map, MSGPACK_OBJECT_STR, "name");
+  serde_assert_str(name_str, "Some random name");
 
-  CU_ASSERT_MAP_KEY(result.data.via.map.ptr[4], "coords");
-  CU_ASSERT_EQUAL(result.data.via.map.ptr[4].val.via.array.ptr[0].via.u64, 45);
-  CU_ASSERT_EQUAL(result.data.via.map.ptr[4].val.via.array.ptr[1].via.u64, 19);
+  msgpack_object_array const *coords = serde_map_get(&result.data.via.map, MSGPACK_OBJECT_ARRAY, "coords");
+  CU_ASSERT_EQUAL(coords->size, 2);
 
-  CU_ASSERT_MAP_KEY(result.data.via.map.ptr[5], "inventory");
+  CU_ASSERT_EQUAL(coords->ptr[0].via.u64, 45);
+  CU_ASSERT_EQUAL(coords->ptr[1].via.u64, 19);
 
-  // We're not checking the validity of the items themselves since this is already
-  // tested elsewhere.
-  CU_ASSERT_EQUAL(result.data.via.map.ptr[5].val.via.array.size, 3);
+  msgpack_object_array const *inventory = serde_map_get(&result.data.via.map, MSGPACK_OBJECT_ARRAY, "inventory");
+  CU_ASSERT_EQUAL(inventory->size, 3);
 
   msgpack_unpacker_destroy(&unpacker);
   msgpack_unpacked_destroy(&result);
@@ -273,7 +337,7 @@ void entity_serialization_test() {
 void entity_deserialize_test(void) {
   msgpack_sbuffer buffer;
   msgpack_sbuffer_init(&buffer);
-  Entity *entity = entity_new(10, ANIMAL, "Bounty the cat", 10, 11);
+  Entity *entity = entity_build(10, ANIMAL, "Bounty the cat", 10, 11);
   entity_inventory_add_item(entity, armor_new("Hairy armor", 10, 10, 0, 0, 15));
   entity_inventory_add_item(entity, tool_new("Lighter", 1, 1, 1, 10));
   entity_inventory_add_item(entity, item_new(FORAGE, "An apple", 1, 1));
@@ -295,10 +359,22 @@ void entity_deserialize_test(void) {
   Entity *rebuilt = entity_deserialize(&result.data.via.map);
   CU_ASSERT_TRUE(strings_equal(entity_get_name(entity), entity_get_name(rebuilt)));
   CU_ASSERT_TRUE(points_equal(entity_get_coords(entity), entity_get_coords(rebuilt)));
-  CU_ASSERT_EQUAL(entity_get_life_points(entity), entity_get_life_points(rebuilt));
-  CU_ASSERT_EQUAL(entity_get_starting_life_points(entity), entity_get_starting_life_points(rebuilt));
-  CU_ASSERT_EQUAL(entity_get_entity_type(entity), entity_get_entity_type(rebuilt));
-  CU_ASSERT_EQUAL(entity_inventory_count(entity), entity_inventory_count(rebuilt));
+
+#define CU_ASSERT_ENTITY_PROP(prop) CU_ASSERT_EQUAL(entity_##prop(entity), entity_##prop(rebuilt));
+
+  CU_ASSERT_ENTITY_PROP(get_life_points);
+  CU_ASSERT_ENTITY_PROP(get_starting_life_points);
+  CU_ASSERT_ENTITY_PROP(get_mental_health);
+  CU_ASSERT_ENTITY_PROP(get_starting_mental_health);
+  CU_ASSERT_ENTITY_PROP(get_hunger);
+  CU_ASSERT_ENTITY_PROP(get_thirst);
+  CU_ASSERT_ENTITY_PROP(get_tiredness);
+  CU_ASSERT_ENTITY_PROP(get_xp);
+  CU_ASSERT_ENTITY_PROP(get_current_level);
+  CU_ASSERT_ENTITY_PROP(get_hearing_distance);
+  CU_ASSERT_ENTITY_PROP(get_seeing_distance);
+  CU_ASSERT_ENTITY_PROP(get_entity_type);
+  CU_ASSERT_ENTITY_PROP(inventory_count);
 
   Item **entity_inventory = entity_inventory_get(entity);
   Item **rebuilt_inventory = entity_inventory_get(rebuilt);
@@ -314,14 +390,68 @@ void entity_deserialize_test(void) {
   entity_free(rebuilt);
 }
 
+void entity_builder_test(void) {
+  EntityBuilder *builder = entity_builder_new();
+  const char    *fmt = "%s #%d";
+
+  uint32_t starting_xp = 100;
+
+  // Default values for most of the entities we're going to create
+  builder->with_seeing_distance(builder, 1)
+    ->with_type(builder, ANIMAL)
+    ->with_xp(builder, starting_xp)
+    ->with_life_points(builder, 5)
+    ->with_mental_health(builder, 10)
+    ->with_hearing_distance(builder, 100)
+    ->with_level(builder, 1);
+
+  char *name = calloc(1024, sizeof(char));
+
+  Entity **results = calloc(10, sizeof(Entity *));
+  for (uint i = 0; i < 10; i++) {
+    sprintf(name, fmt, "A bat", i);
+    results[i] = builder->with_name(builder, name)->with_xp(builder, builder->xp + 10)->build(builder, false);
+    memset(name, 0, strlen(name));
+  }
+
+  // Verifications
+  for (uint i = 0; i < 10; i++) {
+    Entity const *entity = results[i];
+
+    sprintf(name, fmt, "A bat", i);
+    CU_ASSERT_EQUAL(entity_get_xp(entity), starting_xp + 10);
+    CU_ASSERT_EQUAL(entity_get_life_points(entity), 5);
+    CU_ASSERT_EQUAL(entity_get_mental_health(entity), 10);
+    CU_ASSERT_EQUAL(entity_get_hearing_distance(entity), 100);
+    CU_ASSERT_EQUAL(entity_get_seeing_distance(entity), 1);
+    CU_ASSERT_EQUAL(entity_get_entity_type(entity), ANIMAL);
+    CU_ASSERT_EQUAL(entity_get_current_level(entity), 1);
+    CU_ASSERT_TRUE(strings_equal(entity_get_name(entity), name));
+
+    starting_xp += 10;
+
+    memset(name, 0, strlen(name));
+  }
+
+  entity_builder_free(builder);
+  for (uint i = 0; i < 10; i++) {
+    entity_free(results[i]);
+  }
+
+  free(name);
+  free(results);
+}
+
 void entity_test_suite() {
   CU_pSuite suite = CU_add_suite("Entity Tests", nullptr, nullptr);
   CU_add_test(suite, "Create a basic entity", &entity_creation_test);
   CU_add_test(suite, "Manipulate life points", &entity_lifepoints_test);
+  CU_add_test(suite, "Manipulate mental health", &entity_mental_health_test);
   CU_add_test(suite, "Move entities", &entity_move_test);
   CU_add_test(suite, "Resurrect entities", &entity_resurrect_test);
   CU_add_test(suite, "Serialization", &entity_serialization_test);
   CU_add_test(suite, "Deserialization", &entity_deserialize_test);
   CU_add_test(suite, "Inventory manipulation", &entity_inventory_test);
+  CU_add_test(suite, "Entity Builder", &entity_builder_test);
 }
 
