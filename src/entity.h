@@ -103,10 +103,24 @@ Point const *entity_get_coords(Entity const *);
 bool entity_can_move(Entity const *);
 bool entity_is_alive(Entity const *);
 bool entity_is_dead(Entity const *);
+bool entity_is_sane(Entity const *);
+bool entity_is_crazy(Entity const *);
 void entity_move(Entity *, uint32_t delta_x, uint32_t delta_y);
-void entity_hurt(Entity *, uint32_t life_points);
-void entity_heal(Entity *, uint32_t life_points);
+void entity_hurt(Entity *, uint32_t);
+void entity_mental_hurt(Entity *, uint32_t);
+void entity_heal(Entity *, uint32_t);
+void entity_mental_heal(Entity *, uint32_t);
 void entity_resurrect(Entity *);
+void entity_increment_hunger(Entity *);
+void entity_increment_thirst(Entity *);
+void entity_increment_tiredness(Entity *);
+
+// Setters
+void entity_set_hunger(Entity *, uint32_t);
+void entity_set_thirst(Entity *, uint32_t);
+void entity_set_tiredness(Entity *, uint32_t);
+void entity_set_xp(Entity *, uint32_t);
+void entity_set_current_level(Entity *, uint32_t);
 
 // Inventory methods
 size_t entity_inventory_count(Entity const *);

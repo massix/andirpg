@@ -35,6 +35,27 @@ void entity_creation_test(void) {
   CU_ASSERT_EQUAL(point_get_x(entity_coords), 20);
   CU_ASSERT_EQUAL(point_get_y(entity_coords), 30);
 
+  CU_ASSERT_EQUAL(entity_get_seeing_distance(human), 10);
+  CU_ASSERT_EQUAL(entity_get_hearing_distance(human), 10);
+
+#define test_get_set(prop, val)  \
+  entity_set_##prop(human, val); \
+  CU_ASSERT_EQUAL(entity_get_##prop(human), val);
+
+  test_get_set(xp, 42);
+  test_get_set(current_level, 10);
+  test_get_set(thirst, 5);
+  test_get_set(hunger, 42);
+  test_get_set(tiredness, 98);
+
+  entity_increment_hunger(human);
+  entity_increment_thirst(human);
+  entity_increment_tiredness(human);
+
+  CU_ASSERT_EQUAL(entity_get_hunger(human), 43);
+  CU_ASSERT_EQUAL(entity_get_thirst(human), 6);
+  CU_ASSERT_EQUAL(entity_get_tiredness(human), 99);
+
   entity_free(human);
 }
 
@@ -71,6 +92,33 @@ void entity_lifepoints_test(void) {
   CU_ASSERT_EQUAL(entity_get_starting_life_points(monster), 15);
 
   entity_free(monster);
+}
+
+void entity_mental_health_test(void) {
+  EntityBuilder *builder = entity_builder_new();
+  Entity *sane = builder->with_type(builder, ANIMAL)->with_name(builder, "E1")->with_mental_health(builder, 500)->build(builder, true);
+
+  CU_ASSERT_EQUAL(entity_get_mental_health(sane), 500);
+  CU_ASSERT_TRUE(entity_is_sane(sane));
+
+  entity_mental_hurt(sane, 450);
+  CU_ASSERT_EQUAL(entity_get_mental_health(sane), 50);
+  CU_ASSERT_TRUE(entity_is_sane(sane));
+
+  entity_mental_hurt(sane, 80);
+  CU_ASSERT_EQUAL(entity_get_mental_health(sane), 0);
+  CU_ASSERT_FALSE(entity_is_sane(sane));
+  CU_ASSERT_TRUE(entity_is_crazy(sane));
+
+  entity_mental_heal(sane, 380);
+  CU_ASSERT_EQUAL(entity_get_mental_health(sane), 380);
+  CU_ASSERT_FALSE(entity_is_crazy(sane));
+
+  entity_mental_heal(sane, 200);
+  CU_ASSERT_EQUAL(entity_get_mental_health(sane), 500);
+  CU_ASSERT_FALSE(entity_is_crazy(sane));
+
+  entity_free(sane);
 }
 
 void entity_resurrect_test(void) {
@@ -398,6 +446,7 @@ void entity_test_suite() {
   CU_pSuite suite = CU_add_suite("Entity Tests", nullptr, nullptr);
   CU_add_test(suite, "Create a basic entity", &entity_creation_test);
   CU_add_test(suite, "Manipulate life points", &entity_lifepoints_test);
+  CU_add_test(suite, "Manipulate mental health", &entity_mental_health_test);
   CU_add_test(suite, "Move entities", &entity_move_test);
   CU_add_test(suite, "Resurrect entities", &entity_resurrect_test);
   CU_add_test(suite, "Serialization", &entity_serialization_test);

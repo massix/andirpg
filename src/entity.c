@@ -35,6 +35,16 @@
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
+#define GENERATE_SETTER(prop_name)                                 \
+  inline void entity_set_##prop_name(Entity *self, uint32_t val) { \
+    self->_##prop_name = val;                                      \
+  }
+
+#define GENERATE_GETTER(rtype, prop_name)                   \
+  inline rtype entity_get_##prop_name(Entity const *self) { \
+    return self->_##prop_name;                              \
+  }
+
 // This can be a compile-time constant?
 #ifndef MAX_INVENTORY_SIZE
 #define MAX_INVENTORY_SIZE 1024
@@ -346,53 +356,22 @@ inline uint32_t entity_get_starting_life_points(Entity const *entity) {
   return entity->_starting_lp;
 }
 
-inline uint32_t entity_get_mental_health(Entity const *entity) {
-  return entity->_mental_health;
-}
-
-inline uint32_t entity_get_starting_mental_health(Entity const *entity) {
-  return entity->_starting_mental_health;
-}
-
-inline uint32_t entity_get_hunger(Entity const *entity) {
-  return entity->_hunger;
-}
-
-inline uint32_t entity_get_thirst(Entity const *entity) {
-  return entity->_thirst;
-}
-
-inline uint32_t entity_get_tiredness(Entity const *entity) {
-  return entity->_tiredness;
-}
-
-inline uint32_t entity_get_xp(Entity const *entity) {
-  return entity->_xp;
-}
-
-inline uint32_t entity_get_current_level(Entity const *entity) {
-  return entity->_current_level;
-}
-
-inline uint32_t entity_get_hearing_distance(Entity const *entity) {
-  return entity->_hearing_distance;
-}
-
-inline uint32_t entity_get_seeing_distance(Entity const *entity) {
-  return entity->_seeing_distance;
-}
+GENERATE_GETTER(uint32_t, mental_health);
+GENERATE_GETTER(uint32_t, starting_mental_health);
+GENERATE_GETTER(uint32_t, hunger);
+GENERATE_GETTER(uint32_t, thirst);
+GENERATE_GETTER(uint32_t, tiredness);
+GENERATE_GETTER(uint32_t, xp);
+GENERATE_GETTER(uint32_t, current_level);
+GENERATE_GETTER(uint32_t, hearing_distance);
+GENERATE_GETTER(uint32_t, seeing_distance);
 
 inline EntityType entity_get_entity_type(Entity const *entity) {
   return entity->_type;
 }
 
-inline const char *entity_get_name(Entity const *entity) {
-  return entity->_name;
-}
-
-inline Point const *entity_get_coords(Entity const *entity) {
-  return entity->_coords;
-}
+GENERATE_GETTER(char const *, name);
+GENERATE_GETTER(Point const *, coords);
 
 bool entity_can_move(Entity const *ent) {
   bool ret = true;
@@ -420,6 +399,14 @@ inline bool entity_is_dead(Entity const *entity) {
   return !entity_is_alive(entity);
 }
 
+inline bool entity_is_sane(Entity const *entity) {
+  return entity->_mental_health > 0;
+}
+
+inline bool entity_is_crazy(Entity const *entity) {
+  return !entity_is_sane(entity);
+}
+
 void entity_move(Entity *entity, uint32_t delta_x, uint32_t delta_y) {
   if (entity_can_move(entity)) {
     point_set_x(entity->_coords, point_get_x(entity->_coords) + delta_x);
@@ -435,9 +422,24 @@ void entity_hurt(Entity *entity, uint32_t life_points) {
   }
 }
 
+void entity_mental_hurt(Entity *entity, uint32_t mental_damage) {
+  if (mental_damage > entity->_mental_health) {
+    entity->_mental_health = 0;
+  } else {
+    entity->_mental_health = entity->_mental_health - mental_damage;
+  }
+}
+
 void entity_heal(Entity *entity, uint32_t life_points) {
   if (entity->_lp > 0) {
     entity->_lp = min(entity->_starting_lp, entity->_lp + life_points);
+  }
+}
+
+void entity_mental_heal(Entity *entity, uint32_t mental_heal) {
+  entity->_mental_health += mental_heal;
+  if (entity->_mental_health > entity->_starting_mental_health) {
+    entity->_mental_health = entity->_starting_mental_health;
   }
 }
 
@@ -447,6 +449,24 @@ void entity_resurrect(Entity *entity) {
     entity->_lp = entity->_starting_lp;
   }
 }
+
+void entity_increment_hunger(Entity *entity) {
+  entity->_hunger++;
+}
+
+void entity_increment_thirst(Entity *entity) {
+  entity->_thirst++;
+}
+
+void entity_increment_tiredness(Entity *entity) {
+  entity->_tiredness++;
+}
+
+GENERATE_SETTER(hunger);
+GENERATE_SETTER(thirst);
+GENERATE_SETTER(tiredness);
+GENERATE_SETTER(xp);
+GENERATE_SETTER(current_level);
 
 size_t entity_inventory_count(Entity const *entity) {
   size_t count = 0;
