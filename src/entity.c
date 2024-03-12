@@ -32,6 +32,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/cdefs.h>
 #include <sys/types.h>
 
 // This can be a compile-time constant?
@@ -93,19 +94,61 @@ EntityBuilder *eb_with_seeing_distance(EntityBuilder *self, uint32_t seeing_dist
 }
 
 EntityBuilder *eb_with_name(EntityBuilder *self, char const *name) {
-  free(self->name);
+  if (self->name != nullptr) {
+    free(self->name);
+  }
+
   self->name = strdup(name);
   return self;
 }
 
-Entity *eb_build(EntityBuilder const *self) {
-  Entity *ent = entity_new(self->life_points, self->type, self->name, 10, 10);
-  ent->_current_level = self->level;
+EntityBuilder *eb_with_coords(EntityBuilder *self, uint32_t x, uint32_t y) {
+  self->x = x;
+  self->y = y;
+  return self;
+}
+
+EntityBuilder *eb_with_hunger(EntityBuilder *self, uint32_t hunger) {
+  self->hunger = hunger;
+  return self;
+}
+
+EntityBuilder *eb_with_thirst(EntityBuilder *self, uint32_t thirst) {
+  self->thirst = thirst;
+  return self;
+}
+
+EntityBuilder *eb_with_tiredness(EntityBuilder *self, uint32_t tiredness) {
+  self->tiredness = tiredness;
+  return self;
+}
+
+Entity *eb_build(EntityBuilder *self, bool oneshot) {
+  if (self->name == nullptr) {
+    panic("Cannot build an entity without a name!", EC_ENTITY_EMPTY_NAME);
+  }
+
+  Entity *ent = calloc(1, sizeof(Entity));
+  ent->_lp = self->life_points;
+  ent->_starting_lp = self->life_points;
+  ent->_mental_health = self->mental_health;
+  ent->_starting_mental_health = self->mental_health;
+  ent->_hunger = self->hunger;
+  ent->_thirst = self->thirst;
+  ent->_tiredness = self->tiredness;
   ent->_xp = self->xp;
+  ent->_current_level = self->level;
   ent->_hearing_distance = self->hearing_distance;
   ent->_seeing_distance = self->seeing_distance;
-  ent->_starting_mental_health = self->mental_health;
-  ent->_mental_health = self->mental_health;
+  ent->_type = self->type;
+  ent->_name = strdup(self->name);
+  ent->_coords = point_new(self->x, self->y);
+  ent->_inventory = calloc(1, sizeof(Item *));
+  ent->_inventory[0] = nullptr;
+
+  if (oneshot) {
+    entity_builder_free(self);
+  }
 
   return ent;
 }
@@ -115,14 +158,19 @@ EntityBuilder *entity_builder_new() {
   EntityBuilder *builder = calloc(1, sizeof(EntityBuilder));
 
   // Init with some default values
-  builder->name = strdup("Avatar");
+  builder->name = nullptr;
   builder->type = INHUMAN;
   builder->life_points = 30;
   builder->mental_health = 30;
   builder->level = 0;
   builder->xp = 0;
-  builder->seeing_distance = 10;
   builder->hearing_distance = 10;
+  builder->seeing_distance = 10;
+  builder->x = 0;
+  builder->y = 0;
+  builder->hunger = 0;
+  builder->thirst = 0;
+  builder->tiredness = 0;
 
   // Methods
   builder->with_type = &eb_with_type;
@@ -133,6 +181,10 @@ EntityBuilder *entity_builder_new() {
   builder->with_hearing_distance = &eb_with_hd;
   builder->with_seeing_distance = &eb_with_seeing_distance;
   builder->with_name = &eb_with_name;
+  builder->with_coords = &eb_with_coords;
+  builder->with_hunger = &eb_with_hunger;
+  builder->with_thirst = &eb_with_thirst;
+  builder->with_tiredness = &eb_with_tiredness;
   builder->build = &eb_build;
 
   return builder;
@@ -144,29 +196,19 @@ void entity_builder_free(EntityBuilder *self) {
 }
 
 Entity *entity_new(uint32_t starting_lp, EntityType type, const char *name, uint32_t start_x, uint32_t start_y) {
-  LOG_DEBUG("Creating new entity '%s'", name);
+  LOG_ERROR("Trying to create an entity using old constructor", 0);
+  panic("entity_new() is deprecated, please use entity_build() with the same parameters", EC_DEPRECATED_FUNCTION);
 
-  Entity *ret = calloc(1, sizeof(Entity));
-  ret->_lp = starting_lp > 0 ? starting_lp : 1;
-  ret->_starting_lp = ret->_lp;
-  ret->_type = type;
-  ret->_name = strdup(name);
-  ret->_inventory = calloc(1, sizeof(Item *));
-  ret->_inventory[0] = nullptr;
-  ret->_coords = point_new(start_x, start_y);
+  return nullptr; // Should never arrive here
+}
 
-  // FIXME: remove these default values
-  ret->_mental_health = 30;
-  ret->_starting_mental_health = 30;
-  ret->_hunger = 0;
-  ret->_thirst = 0;
-  ret->_tiredness = 0;
-  ret->_xp = 0;
-  ret->_current_level = 0;
-  ret->_hearing_distance = 0;
-  ret->_seeing_distance = 0;
-
-  return ret;
+Entity *entity_build(uint32_t starting_lp, EntityType type, const char *name, uint32_t start_x, uint32_t start_y) {
+  EntityBuilder *builder = entity_builder_new();
+  return builder->with_life_points(builder, starting_lp)
+    ->with_type(builder, type)
+    ->with_name(builder, name)
+    ->with_coords(builder, start_x, start_y)
+    ->build(builder, true);
 }
 
 Entity *entity_deserialize(msgpack_object_map const *map) {
@@ -195,6 +237,7 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
 
 #define smg(t, f) t f = *(t *)serde_map_get(map, MSGPACK_OBJECT_POSITIVE_INTEGER, #f);
 
+  // NOLINTNEXTLINE(readability-identifier-length)
   smg(uint32_t, lp);
   smg(uint32_t, starting_lp);
   smg(uint32_t, mental_health);

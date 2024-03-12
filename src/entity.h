@@ -42,14 +42,19 @@ typedef enum EntityType {
 } EntityType;
 
 typedef struct EntityBuilder {
-  EntityType type;
-  uint32_t   life_points;
-  uint32_t   mental_health;
-  uint32_t   level;
-  uint32_t   xp;
-  uint32_t   hearing_distance;
-  uint32_t   seeing_distance;
-  char      *name;
+  EntityType type;             // Default: INHUMAN
+  uint32_t   life_points;      // Default: 30
+  uint32_t   mental_health;    // Default: 30
+  uint32_t   level;            // Default: 0
+  uint32_t   xp;               // Default: 0
+  uint32_t   hearing_distance; // Default: 10
+  uint32_t   seeing_distance;  // Default: 10
+  uint32_t   x;                // Default: 0
+  uint32_t   y;                // Default: 0
+  uint32_t   hunger;           // Default: 0
+  uint32_t   thirst;           // Default: 0
+  uint32_t   tiredness;        // Default: 0
+  char      *name;             // Default: nullptr (MANDATORY)
 
   struct EntityBuilder *(*with_type)(struct EntityBuilder *, EntityType);
   struct EntityBuilder *(*with_life_points)(struct EntityBuilder *, uint32_t);
@@ -59,14 +64,21 @@ typedef struct EntityBuilder {
   struct EntityBuilder *(*with_hearing_distance)(struct EntityBuilder *, uint32_t);
   struct EntityBuilder *(*with_seeing_distance)(struct EntityBuilder *, uint32_t);
   struct EntityBuilder *(*with_name)(struct EntityBuilder *, char const *);
-  Entity *(*build)(struct EntityBuilder const *);
+  struct EntityBuilder *(*with_coords)(struct EntityBuilder *, uint32_t x, uint32_t y);
+  struct EntityBuilder *(*with_hunger)(struct EntityBuilder *, uint32_t);
+  struct EntityBuilder *(*with_thirst)(struct EntityBuilder *, uint32_t);
+  struct EntityBuilder *(*with_tiredness)(struct EntityBuilder *, uint32_t);
+  Entity *(*build)(struct EntityBuilder *, bool oneshot);
 } EntityBuilder;
 
 EntityBuilder *entity_builder_new();
 void           entity_builder_free(EntityBuilder *);
 
 // Constructors and destructors
-Entity *entity_new(uint32_t starting_lp, EntityType type, const char *name, uint32_t start_x, uint32_t start_y);
+Entity *entity_new(uint32_t starting_lp, EntityType type, const char *name, uint32_t start_x, uint32_t start_y)
+  __attribute__((deprecated("Deprecated constructor, use entity_build() with the same parameters")));
+// Commodity constructor based on builder with all the default values
+Entity *entity_build(uint32_t starting_lp, EntityType type, const char *name, uint32_t start_x, uint32_t start_y);
 Entity *entity_deserialize(msgpack_object_map const *);
 void    entity_serialize(Entity const *, msgpack_sbuffer *);
 void    entity_free(Entity *);

@@ -21,8 +21,10 @@
 
 #include "utils.h"
 #include <assert.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 inline bool strings_equal(const char *lhs, const char *rhs) {
@@ -54,5 +56,16 @@ inline int64_t file_size(FILE *file) {
   fseek(file, current_pos, SEEK_SET);
 
   return length;
+}
+
+void panic(const char *fmt, ErrorCode error_code, ...) {
+  va_list list;
+  va_start(list, error_code);
+  fprintf(stderr, "\n PANIC (%d): \"", error_code);
+  vfprintf(stderr, fmt, list);
+  fprintf(stderr, "\"\n");
+  va_end(list);
+
+  exit(error_code);
 }
 

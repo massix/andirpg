@@ -25,10 +25,18 @@
 #include <stdint.h>
 #include <stdio.h>
 
+typedef enum ErrorCode {
+  // 100 - onwards = error in code
+  EC_DEPRECATED_FUNCTION = 101,
+  EC_ENTITY_EMPTY_NAME = 102,
+} ErrorCode;
+
 bool     strings_equal(const char *, const char *);
 uint32_t min(uint32_t, uint32_t);
 uint32_t max(uint32_t, uint32_t);
 int64_t  file_size(FILE *);
+
+void panic(const char *fmt, ErrorCode, ...);
 
 #endif
 

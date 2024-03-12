@@ -24,7 +24,7 @@
   }
 
 void entity_creation_test(void) {
-  Entity *human = entity_new(30, HUMAN, "Avatar", 20, 30);
+  Entity *human = entity_build(30, HUMAN, "Avatar", 20, 30);
 
   CU_ASSERT_TRUE(strings_equal(entity_get_name(human), "Avatar"));
   CU_ASSERT_EQUAL(entity_get_entity_type(human), HUMAN);
@@ -39,7 +39,7 @@ void entity_creation_test(void) {
 }
 
 void entity_lifepoints_test(void) {
-  Entity *monster = entity_new(15, INHUMAN, "Orc", 20, 20);
+  Entity *monster = entity_build(15, INHUMAN, "Orc", 20, 20);
   CU_ASSERT_EQUAL(entity_get_life_points(monster), 15);
 
   // Can hurt a creature
@@ -74,8 +74,8 @@ void entity_lifepoints_test(void) {
 }
 
 void entity_resurrect_test(void) {
-  Entity *human = entity_new(15, HUMAN, "human", 0, 0);
-  Entity *inhuman = entity_new(15, INHUMAN, "inhuman", 0, 0);
+  Entity *human = entity_build(15, HUMAN, "human", 0, 0);
+  Entity *inhuman = entity_build(15, INHUMAN, "inhuman", 0, 0);
   entity_hurt(human, 15);
   entity_hurt(inhuman, 15);
 
@@ -95,7 +95,7 @@ void entity_resurrect_test(void) {
 }
 
 void entity_move_test(void) {
-  Entity *dog = entity_new(30, ANIMAL, "Bounty", 46, -8);
+  Entity *dog = entity_build(30, ANIMAL, "Bounty", 46, -8);
   CU_ASSERT_TRUE(entity_can_move(dog));
 
   entity_move(dog, -4, 20);
@@ -103,13 +103,13 @@ void entity_move_test(void) {
   CU_ASSERT_EQUAL(point_get_x(entity_get_coords(dog)), 42);
   CU_ASSERT_EQUAL(point_get_y(entity_get_coords(dog)), 12);
 
-  Entity *tree = entity_new(1, TREE, "Ent", 20, 1);
+  Entity *tree = entity_build(1, TREE, "Ent", 20, 1);
   CU_ASSERT_FALSE(entity_can_move(tree));
   entity_move(tree, 10, 14);
   CU_ASSERT_EQUAL(point_get_x(entity_get_coords(tree)), 20);
   CU_ASSERT_EQUAL(point_get_y(entity_get_coords(tree)), 1);
 
-  Entity *mountain = entity_new(1, MOUNTAIN, "Fuji", 10, 14);
+  Entity *mountain = entity_build(1, MOUNTAIN, "Fuji", 10, 14);
   CU_ASSERT_FALSE(entity_can_move(mountain));
 
   // Dead entities cannot move
@@ -136,7 +136,7 @@ bool filter_none(Item const *) {
 }
 
 void entity_inventory_test(void) {
-  Entity *entity = entity_new(20, HUMAN, "An human", 0, 0);
+  Entity *entity = entity_build(20, HUMAN, "An human", 0, 0);
   CU_ASSERT_EQUAL(entity_inventory_count(entity), 0);
 
   entity_inventory_add_item(entity, weapon_new("Weapon number one", 30, 20, 1, 10, 10));
@@ -182,7 +182,7 @@ void entity_inventory_test(void) {
   entity_inventory_clear(entity);
   CU_ASSERT_EQUAL(entity_inventory_count(entity), 0);
 
-  Entity *empty_inventory = entity_new(10, TREE, "A tree", 0, 0);
+  Entity *empty_inventory = entity_build(10, TREE, "A tree", 0, 0);
   entity_inventory_remove_item(empty_inventory, "Not existing");
   CU_ASSERT_EQUAL(entity_inventory_count(empty_inventory), 0);
 
@@ -196,7 +196,7 @@ void entity_inventory_test(void) {
 void entity_serialization_test() {
   const char *filename = "./entity_serialization.bin";
 
-  Entity *entity = entity_new(30, HUMAN, "Some random name", 42, 23);
+  Entity *entity = entity_build(30, HUMAN, "Some random name", 42, 23);
   entity_inventory_add_item(entity, tool_new("Pickaxe", 30, 15, 2, 14));
   entity_inventory_add_item(entity, armor_new("An armor", 30, 16, 50, 30, 4));
   entity_inventory_add_item(entity, item_new(FORAGE, "A fruit", 10, 30));
@@ -261,8 +261,8 @@ void entity_serialization_test() {
   serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, tiredness, 0);
   serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, xp, 0);
   serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, current_level, 0);
-  serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, hearing_distance, 0);
-  serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, seeing_distance, 0);
+  serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, hearing_distance, 10);
+  serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, seeing_distance, 10);
   serde_map_assert_with_value(POSITIVE_INTEGER, EntityType, type, HUMAN);
 
   serde_map_assert(&result.data.via.map, MSGPACK_OBJECT_STR, "name");
@@ -289,7 +289,7 @@ void entity_serialization_test() {
 void entity_deserialize_test(void) {
   msgpack_sbuffer buffer;
   msgpack_sbuffer_init(&buffer);
-  Entity *entity = entity_new(10, ANIMAL, "Bounty the cat", 10, 11);
+  Entity *entity = entity_build(10, ANIMAL, "Bounty the cat", 10, 11);
   entity_inventory_add_item(entity, armor_new("Hairy armor", 10, 10, 0, 0, 15));
   entity_inventory_add_item(entity, tool_new("Lighter", 1, 1, 1, 10));
   entity_inventory_add_item(entity, item_new(FORAGE, "An apple", 1, 1));
@@ -362,7 +362,7 @@ void entity_builder_test(void) {
   Entity **results = calloc(10, sizeof(Entity *));
   for (uint i = 0; i < 10; i++) {
     sprintf(name, fmt, "A bat", i);
-    results[i] = builder->with_name(builder, name)->with_xp(builder, builder->xp + 10)->build(builder);
+    results[i] = builder->with_name(builder, name)->with_xp(builder, builder->xp + 10)->build(builder, false);
     memset(name, 0, strlen(name));
   }
 
