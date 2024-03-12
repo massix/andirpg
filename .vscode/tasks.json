@@ -3,6 +3,18 @@
   "type": "shell",
   "command": "xmake",
   "workdir": "${workspaceFolder}",
+  "problemMatcher": {
+    "owner": "c",
+    "pattern": {
+      "regexp": "^(.*): (.*):(\\d+):(\\d+): (.*)$",
+      "severity": 1,
+      "file": 2,
+      "line": 3,
+      "column": 4,
+      "message": 5
+    },
+    "fileLocation": "relative"
+  },
   "tasks": [
     {
       "label": "Build",
@@ -27,7 +39,8 @@
         "c"
       ],
       "group": "build",
-      "isBackground": false
+      "isBackground": false,
+      "problemMatcher": {}
     },
     {
       "label": "Run Tests",
@@ -39,7 +52,18 @@
       ],
       "group": "test",
       "isBackground": false,
-      "dependsOn": "Build Test"
+      "dependsOn": "Build Test",
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "(\\d+)\\. (.*):(\\d+)  - (.*)$",
+          "code": 1,
+          "file": 2,
+          "line": 3,
+          "message": 4
+        },
+        "severity": "error",
+        "fileLocation": "relative"
+      }
     },
     {
       "label": "Watch Build",
