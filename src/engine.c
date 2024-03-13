@@ -139,7 +139,7 @@ inline void engine_clear_active_entity(Engine *engine) {
   engine->_active_entity = nullptr;
 }
 
-void engine_move_entity(Engine *engine, Entity *entity, uint32_t delta_x, uint32_t delta_y) {
+void engine_move_entity(Engine const *engine, Entity *entity, uint32_t delta_x, uint32_t delta_y) {
 
   MapBoundaries boundaries = map_get_boundaries(engine->_map);
   Point const  *current = entity_get_coords(entity);
@@ -232,7 +232,7 @@ bool entities_are_close(Entity const *lhs, Entity const *rhs) {
 }
 
 // Move all entities apart from the active one
-void engine_move_all_entities(Engine *engine) {
+void engine_move_all_entities(Engine const *engine) {
   LOG_DEBUG("Moving all entities", 0);
   Entity **all_entities = map_get_all_entities(engine->_map);
 
@@ -259,7 +259,7 @@ void engine_move_all_entities(Engine *engine) {
   }
 }
 
-Entity **engine_get_close_entities(Engine *engine, ssize_t *size) {
+Entity **engine_get_close_entities(Engine const *engine, ssize_t *size) {
   Entity **ret = nullptr;
 
   Entity const *active = engine_get_active_entity(engine);

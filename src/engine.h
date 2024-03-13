@@ -49,8 +49,8 @@ void engine_clear_active_entity(Engine *);
 
 // Methods
 void     engine_handle_keypress(Engine *, char);
-void     engine_move_all_entities(Engine *);
-Entity **engine_get_close_entities(Engine *, ssize_t *);
+void     engine_move_all_entities(Engine const *);
+Entity **engine_get_close_entities(Engine const *, ssize_t *);
 
 // Entities
 void engine_add_entity(Engine *, Entity *);
