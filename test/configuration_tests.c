@@ -33,8 +33,20 @@ void configuration_parse_test(void) {
   configuration_free(configuration);
 }
 
+void configuration_file_does_not_exist(void) {
+  Configuration *configuration = configuration_new("./test/not_exists.ini");
+  configuration_init(configuration);
+
+  // Without initing it should only have the default values
+  CU_ASSERT_EQUAL(configuration_get_player_starting_hp(configuration), 10);
+  CU_ASSERT_TRUE(strings_equal(configuration_get_player_name(configuration), "NoName"));
+
+  configuration_free(configuration);
+}
+
 void configuration_test_suite() {
   CU_pSuite suite = CU_add_suite("Configuration Tests", nullptr, nullptr);
   CU_add_test(suite, "New configuration", &configuration_new_test);
   CU_add_test(suite, "Parse configuration", &configuration_parse_test);
+  CU_add_test(suite, "File does not exist", &configuration_file_does_not_exist);
 }
