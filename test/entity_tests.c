@@ -1,4 +1,5 @@
 #include "item.h"
+#include "perk.h"
 #include "point.h"
 #include "serde.h"
 #include "utils.h"
@@ -442,6 +443,66 @@ void entity_builder_test(void) {
   free(results);
 }
 
+bool perk_filter(Perk const *perk) {
+  return strings_equal(perk_get_name(perk), "MentalAugmented") || strings_equal(perk_get_name(perk), "NightVision");
+}
+
+void entity_perks_test(void) {
+  EntityBuilder *builder = entity_builder_new();
+
+  Entity *entity = builder->with_name(builder, "Perked Entity")->with_xp(builder, 300)->build(builder, true);
+
+  CU_ASSERT_EQUAL(entity_perks_count(entity), 0);
+
+  const char *stuff[] = {
+    "MentalAugmented",
+    "LifeAugmented",
+    "NightVision",
+    "Robustness",
+  };
+
+  for (uint8_t i = 0; i < 4; i++) {
+    entity_perks_add(entity, perk_new(PT_ITEMS_STATS, stuff[i]));
+  }
+
+  CU_ASSERT_EQUAL(entity_perks_count(entity), 4);
+  CU_ASSERT_TRUE(entity_perks_has_perk(entity, "NightVision"));
+  CU_ASSERT_TRUE(entity_perks_has_perk(entity, "LifeAugmented"));
+  CU_ASSERT_FALSE(entity_perks_has_perk(entity, "NonExisting"));
+
+  Perk const *night_vision = entity_perks_get(entity, "NightVision");
+  CU_ASSERT_PTR_NOT_NULL(night_vision);
+  CU_ASSERT_EQUAL(perk_get_perk_type(night_vision), PT_ITEMS_STATS);
+
+  CU_ASSERT_PTR_NULL(entity_perks_get(entity, "NotExisting"));
+
+  size_t filtered_list_size;
+  Perk **filtered = entity_perks_filter(entity, &perk_filter, &filtered_list_size);
+
+  CU_ASSERT_EQUAL(filtered_list_size, 2);
+  CU_ASSERT_TRUE(strings_equal(perk_get_name(filtered[0]), "MentalAugmented"));
+  CU_ASSERT_TRUE(strings_equal(perk_get_name(filtered[1]), "NightVision"));
+
+  // Make sure we can walk the list either using nullptr termination or in a classic way
+  for (size_t i = 0; i < filtered_list_size; i++) {
+    CU_ASSERT_PTR_NOT_NULL(filtered[i]);
+  }
+
+  size_t      count = 0;
+  Perk const *current_item = filtered[count];
+  while (current_item != nullptr) {
+    bool ma_bool = strings_equal(perk_get_name(current_item), "MentalAugmented");
+    bool nv_bool = strings_equal(perk_get_name(current_item), "NightVision");
+
+    CU_ASSERT_TRUE(ma_bool || nv_bool);
+    current_item = filtered[++count];
+  }
+
+  CU_ASSERT_EQUAL(count, 2);
+
+  entity_free(entity);
+}
+
 void entity_test_suite() {
   CU_pSuite suite = CU_add_suite("Entity Tests", nullptr, nullptr);
   CU_add_test(suite, "Create a basic entity", &entity_creation_test);
@@ -452,6 +513,7 @@ void entity_test_suite() {
   CU_add_test(suite, "Serialization", &entity_serialization_test);
   CU_add_test(suite, "Deserialization", &entity_deserialize_test);
   CU_add_test(suite, "Inventory manipulation", &entity_inventory_test);
+  CU_add_test(suite, "Perks manipulation", &entity_perks_test);
   CU_add_test(suite, "Entity Builder", &entity_builder_test);
 }
 

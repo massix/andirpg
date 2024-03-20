@@ -22,6 +22,7 @@
 #include "entity.h"
 #include "item.h"
 #include "logger.h"
+#include "perk.h"
 #include "point.h"
 #include "serde.h"
 #include "utils.h"
@@ -66,6 +67,7 @@ struct Entity {
   char      *_name;
   Point     *_coords;
   Item     **_inventory;
+  Perk     **_perks;
 };
 
 EntityBuilder *eb_with_type(EntityBuilder *self, EntityType type) {
@@ -155,6 +157,8 @@ Entity *eb_build(EntityBuilder *self, bool oneshot) {
   ent->_coords = point_new(self->x, self->y);
   ent->_inventory = calloc(1, sizeof(Item *));
   ent->_inventory[0] = nullptr;
+  ent->_perks = calloc(1, sizeof(Perk *));
+  ent->_perks[0] = nullptr;
 
   if (oneshot) {
     entity_builder_free(self);
@@ -282,8 +286,7 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   assign(hearing_distance);
   assign(seeing_distance);
   assign(type);
-
-  entity->_coords = coords;
+  assign(coords);
 
   msgpack_object_str const *name_ptr = serde_map_get(map, MSGPACK_OBJECT_STR, "name");
 
@@ -297,6 +300,10 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   for (uint i = 0; i < inventory->size; i++) {
     entity->_inventory[i] = item_deserialize(&(inventory->ptr[i].via.map));
   }
+
+  // TODO: work on perks serial/deserial
+  entity->_perks = calloc(1, sizeof(Perk *));
+  entity->_perks[0] = nullptr;
 
   return entity;
 }
@@ -342,9 +349,15 @@ void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
 
 void entity_free(Entity *entity) {
   free(entity->_name);
+
   point_free(entity->_coords);
+
   entity_inventory_clear(entity);
   free(entity->_inventory);
+
+  entity_perks_clear(entity);
+  free(entity->_perks);
+
   free(entity);
 }
 
@@ -565,4 +578,96 @@ Item **entity_inventory_filter(Entity *entity, bool (*filter_function)(Item cons
 
 inline Item **entity_inventory_get(Entity const *entity) {
   return entity->_inventory;
+}
+
+size_t entity_perks_count(const Entity *self) {
+  size_t      count = 0;
+  Perk const *ptr = self->_perks[count];
+
+  while (ptr != nullptr) {
+    ptr = self->_perks[++count];
+  }
+
+  return count;
+}
+
+void entity_perks_add(Entity *self, Perk *perk) {
+  // Get first valid slot
+  size_t first_null = entity_perks_count(self);
+
+  // Need to take nullptr into account
+  self->_perks = realloc(self->_perks, (first_null + 2) * sizeof(Perk *));
+  self->_perks[first_null] = perk;
+  self->_perks[first_null + 1] = nullptr;
+}
+
+void entity_perks_remove(Entity *self, const char *perk_name) {
+  bool    perk_found = false;
+  uint8_t perk_index = 0;
+  size_t  perk_count = entity_perks_count(self);
+
+  for (size_t i = 0; i < perk_count; i++) {
+    if (strings_equal(perk_get_name(self->_perks[i]), perk_name)) {
+      perk_found = true;
+      perk_index = i;
+    }
+  }
+
+  if (perk_found) {
+    perk_free(self->_perks[perk_index]);
+    self->_perks[perk_index] = self->_perks[perk_count - 1];
+    self->_perks[perk_count - 1] = nullptr;
+    self->_perks = realloc(self->_perks, perk_count * sizeof(Perk *));
+  }
+}
+
+bool entity_perks_has_perk(Entity const *self, const char *perk_name) {
+  for (size_t i = 0; i < entity_perks_count(self); i++) {
+    if (strings_equal(perk_get_name(self->_perks[i]), perk_name)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void entity_perks_clear(Entity *self) {
+  for (size_t i = 0; i < entity_perks_count(self); i++) {
+    perk_free(self->_perks[i]);
+  }
+
+  self->_perks = realloc(self->_perks, 1 * sizeof(Perk *));
+  self->_perks[0] = nullptr;
+}
+
+Perk **entity_perks_get_all(Entity const *self) {
+  return self->_perks;
+}
+
+Perk **entity_perks_filter(Entity const *self, bool (*filter_fn)(Perk const *), size_t *list_size) {
+  size_t items = 0;
+  Perk **result = calloc(1, sizeof(Perk *));
+  result[0] = nullptr;
+
+  for (size_t i = 0; i < entity_perks_count(self); i++) {
+    if (filter_fn(self->_perks[i])) {
+      items++;
+      result = realloc(result, (items + 1) * sizeof(Perk *));
+      result[items - 1] = self->_perks[i];
+      result[items] = nullptr;
+    }
+  }
+
+  *list_size = items;
+  return result;
+}
+
+Perk const *entity_perks_get(Entity const *self, char const *perk_name) {
+  for (size_t i = 0; i < entity_perks_count(self); i++) {
+    if (strings_equal(perk_get_name(self->_perks[i]), perk_name)) {
+      return self->_perks[i];
+    }
+  }
+
+  return nullptr;
 }
