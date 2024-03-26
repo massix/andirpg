@@ -23,6 +23,7 @@
 #define __ENTITY__H__
 
 #include "item.h"
+#include "perk.h"
 #include <msgpack/object.h>
 #include <msgpack/pack.h>
 #include <msgpack/sbuffer.h>
@@ -129,5 +130,14 @@ void   entity_inventory_remove_item(Entity *, const char *);
 void   entity_inventory_clear(Entity *);
 Item **entity_inventory_filter(Entity *, bool (*)(Item const *), ssize_t *);
 Item **entity_inventory_get(Entity const *); // PERF: Only useful for tests
+
+// Perks methods
+size_t      entity_perks_count(Entity const *);
+void        entity_perks_add(Entity *, Perk *);
+void        entity_perks_remove(Entity *, char const *);
+bool        entity_perks_has_perk(Entity const *, char const *);
+void        entity_perks_clear(Entity *);
+Perk      **entity_perks_filter(Entity const *, bool (*)(Perk const *), size_t *);
+Perk const *entity_perks_get(Entity const *, char const *);
 
 #endif

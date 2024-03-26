@@ -20,8 +20,10 @@
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "entity.h"
+#include "collections/linked_list.h"
 #include "item.h"
 #include "logger.h"
+#include "perk.h"
 #include "point.h"
 #include "serde.h"
 #include "utils.h"
@@ -51,21 +53,22 @@
 #endif
 
 struct Entity {
-  uint32_t   _lp;
-  uint32_t   _starting_lp;
-  uint32_t   _mental_health;
-  uint32_t   _starting_mental_health;
-  uint32_t   _hunger;
-  uint32_t   _thirst;
-  uint32_t   _tiredness;
-  uint32_t   _xp;
-  uint32_t   _current_level;
-  uint32_t   _hearing_distance;
-  uint32_t   _seeing_distance;
-  EntityType _type;
-  char      *_name;
-  Point     *_coords;
-  Item     **_inventory;
+  uint32_t    _lp;
+  uint32_t    _starting_lp;
+  uint32_t    _mental_health;
+  uint32_t    _starting_mental_health;
+  uint32_t    _hunger;
+  uint32_t    _thirst;
+  uint32_t    _tiredness;
+  uint32_t    _xp;
+  uint32_t    _current_level;
+  uint32_t    _hearing_distance;
+  uint32_t    _seeing_distance;
+  EntityType  _type;
+  char       *_name;
+  Point      *_coords;
+  Item      **_inventory;
+  LinkedList *_perks;
 };
 
 EntityBuilder *eb_with_type(EntityBuilder *self, EntityType type) {
@@ -155,6 +158,7 @@ Entity *eb_build(EntityBuilder *self, bool oneshot) {
   ent->_coords = point_new(self->x, self->y);
   ent->_inventory = calloc(1, sizeof(Item *));
   ent->_inventory[0] = nullptr;
+  ent->_perks = linked_list_new(32, (FreeFunction)&perk_free);
 
   if (oneshot) {
     entity_builder_free(self);
@@ -225,7 +229,7 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   LOG_INFO("Unmarshalling entity", 0);
   LOG_INFO("Validating map", 0);
 
-  assert(map->size == 15);
+  assert(map->size == 16);
 
 #define sma(t, f) serde_map_assert(map, MSGPACK_OBJECT_##t, f);
 
@@ -244,6 +248,7 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   sma(STR, "name");
   sma(ARRAY, "coords");
   sma(ARRAY, "inventory");
+  sma(ARRAY, "perks");
 
 #define smg(t, f) t f = *(t *)serde_map_get(map, MSGPACK_OBJECT_POSITIVE_INTEGER, #f);
 
@@ -282,8 +287,7 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   assign(hearing_distance);
   assign(seeing_distance);
   assign(type);
-
-  entity->_coords = coords;
+  assign(coords);
 
   msgpack_object_str const *name_ptr = serde_map_get(map, MSGPACK_OBJECT_STR, "name");
 
@@ -298,6 +302,12 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
     entity->_inventory[i] = item_deserialize(&(inventory->ptr[i].via.map));
   }
 
+  msgpack_object_array const *perks = serde_map_get(map, MSGPACK_OBJECT_ARRAY, "perks");
+  entity->_perks = linked_list_new(32, (FreeFunction)&perk_free);
+  for (uint i = 0; i < perks->size; i++) {
+    linked_list_add(entity->_perks, perk_deserialize(&(perks->ptr[i].via.map)));
+  }
+
   return entity;
 }
 
@@ -305,7 +315,7 @@ void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
   msgpack_packer packer;
   msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
 
-  msgpack_pack_map(&packer, 15);
+  msgpack_pack_map(&packer, 16);
 
 #define PACK_UINT(t, s)        \
   serde_pack_str(&packer, #t); \
@@ -338,13 +348,26 @@ void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
   for (uint32_t i = 0; i < inventory_count; i++) {
     item_serialize(ent->_inventory[i], buffer);
   }
+
+  serde_pack_str(&packer, "perks");
+  msgpack_pack_array(&packer, linked_list_count(ent->_perks));
+  linked_list_iterator_reset(ent->_perks);
+  for (Perk const *current = linked_list_iterator_next(ent->_perks); current != nullptr; current = linked_list_iterator_next(ent->_perks)) {
+    perk_serialize(current, buffer);
+  }
 }
 
 void entity_free(Entity *entity) {
   free(entity->_name);
+
   point_free(entity->_coords);
+
   entity_inventory_clear(entity);
   free(entity->_inventory);
+
+  entity_perks_clear(entity);
+  free(entity->_perks);
+
   free(entity);
 }
 
@@ -565,4 +588,73 @@ Item **entity_inventory_filter(Entity *entity, bool (*filter_function)(Item cons
 
 inline Item **entity_inventory_get(Entity const *entity) {
   return entity->_inventory;
+}
+
+size_t entity_perks_count(const Entity *self) {
+  return linked_list_count(self->_perks);
+}
+
+void entity_perks_add(Entity *self, Perk *perk) {
+  linked_list_add(self->_perks, perk);
+}
+
+void entity_perks_remove(Entity *self, const char *perk_name) {
+  if (linked_list_is_empty(self->_perks)) {
+    return;
+  }
+
+  bool    perk_found = false;
+  uint8_t perk_index = 0;
+
+  linked_list_iterator_reset(self->_perks);
+
+  for (Perk const *current = linked_list_iterator_next(self->_perks); current != nullptr;
+       current = linked_list_iterator_next(self->_perks)) {
+    if (strings_equal(perk_get_name(current), perk_name)) {
+      perk_found = true;
+      break;
+    }
+
+    perk_index++;
+  }
+
+  if (perk_found) {
+    linked_list_remove(self->_perks, perk_index);
+  }
+}
+
+bool entity_perks_has_perk(Entity const *self, const char *perk_name) {
+  linked_list_iterator_reset(self->_perks);
+  for (Perk const *current = linked_list_iterator_next(self->_perks); current != nullptr;
+       current = linked_list_iterator_next(self->_perks)) {
+    if (strings_equal(perk_get_name(current), perk_name)) {
+      return true;
+    }
+  };
+
+  return false;
+}
+
+void entity_perks_clear(Entity *self) {
+  while (!linked_list_is_empty(self->_perks)) {
+    linked_list_remove(self->_perks, 0);
+  }
+
+  linked_list_memory_shrink(self->_perks);
+}
+
+Perk **entity_perks_filter(Entity const *self, bool (*filter_fn)(Perk const *), size_t *list_size) {
+  return (Perk **)linked_list_find_all(self->_perks, (Comparator)filter_fn, list_size);
+}
+
+Perk const *entity_perks_get(Entity const *self, char const *perk_name) {
+  linked_list_iterator_reset(self->_perks);
+  for (Perk const *current = linked_list_iterator_next(self->_perks); current != nullptr;
+       current = linked_list_iterator_next(self->_perks)) {
+    if (strings_equal(perk_get_name(current), perk_name)) {
+      return current;
+    }
+  }
+
+  return nullptr;
 }

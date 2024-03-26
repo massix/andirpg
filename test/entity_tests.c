@@ -1,4 +1,5 @@
 #include "item.h"
+#include "perk.h"
 #include "point.h"
 #include "serde.h"
 #include "utils.h"
@@ -249,6 +250,9 @@ void entity_serialization_test() {
   entity_inventory_add_item(entity, armor_new("An armor", 30, 16, 50, 30, 4));
   entity_inventory_add_item(entity, item_new(FORAGE, "A fruit", 10, 30));
 
+  entity_perks_add(entity, perk_new(PT_ITEMS_STATS, "Mechanic"));
+  entity_perks_add(entity, perk_new(PT_ENTITY_STATS, "NightVision"));
+
   // Simulate something in the engine
   entity_hurt(entity, 12);
   entity_move(entity, 3, -4);
@@ -291,7 +295,7 @@ void entity_serialization_test() {
   CU_ASSERT_EQUAL(msgpack_unpacker_next(&unpacker, &result), MSGPACK_UNPACK_SUCCESS);
 
   CU_ASSERT_EQUAL(result.data.type, MSGPACK_OBJECT_MAP);
-  CU_ASSERT_EQUAL(result.data.via.map.size, 15);
+  CU_ASSERT_EQUAL(result.data.via.map.size, 16);
 
 #define serde_map_assert_with_value(type, ctype, field, expected_value)                            \
   {                                                                                                \
@@ -316,6 +320,7 @@ void entity_serialization_test() {
   serde_map_assert(&result.data.via.map, MSGPACK_OBJECT_STR, "name");
   serde_map_assert(&result.data.via.map, MSGPACK_OBJECT_ARRAY, "coords");
   serde_map_assert(&result.data.via.map, MSGPACK_OBJECT_ARRAY, "inventory");
+  serde_map_assert(&result.data.via.map, MSGPACK_OBJECT_ARRAY, "perks");
 
   msgpack_object_str const *name_str = serde_map_get(&result.data.via.map, MSGPACK_OBJECT_STR, "name");
   serde_assert_str(name_str, "Some random name");
@@ -329,6 +334,9 @@ void entity_serialization_test() {
   msgpack_object_array const *inventory = serde_map_get(&result.data.via.map, MSGPACK_OBJECT_ARRAY, "inventory");
   CU_ASSERT_EQUAL(inventory->size, 3);
 
+  msgpack_object_array const *perks = serde_map_get(&result.data.via.map, MSGPACK_OBJECT_ARRAY, "perks");
+  CU_ASSERT_EQUAL(perks->size, 2);
+
   msgpack_unpacker_destroy(&unpacker);
   msgpack_unpacked_destroy(&result);
   entity_free(entity);
@@ -341,6 +349,9 @@ void entity_deserialize_test(void) {
   entity_inventory_add_item(entity, armor_new("Hairy armor", 10, 10, 0, 0, 15));
   entity_inventory_add_item(entity, tool_new("Lighter", 1, 1, 1, 10));
   entity_inventory_add_item(entity, item_new(FORAGE, "An apple", 1, 1));
+
+  entity_perks_add(entity, perk_new(PT_ENVIRONMENT, "AlwaysLit"));
+  entity_perks_add(entity, perk_new(PT_ENTITY_STATS, "NeverTired"));
 
   entity_hurt(entity, 3);
   entity_serialize(entity, &buffer);
@@ -383,6 +394,13 @@ void entity_deserialize_test(void) {
     // We're not checking the whole item since that is already done in the item_test
     CU_ASSERT_EQUAL(item_get_type(entity_inventory[i]), item_get_type(rebuilt_inventory[i]));
   }
+
+  CU_ASSERT_EQUAL(entity_perks_count(entity), entity_perks_count(rebuilt));
+
+  Perk const *original_perk = entity_perks_get(entity, "AlwaysLit");
+  Perk const *rebuilt_perk = entity_perks_get(rebuilt, "AlwaysLit");
+  CU_ASSERT_PTR_NOT_NULL(original_perk);
+  CU_ASSERT_PTR_NOT_NULL(rebuilt_perk);
 
   msgpack_unpacker_destroy(&unpacker);
   msgpack_sbuffer_destroy(&buffer);
@@ -442,6 +460,67 @@ void entity_builder_test(void) {
   free(results);
 }
 
+bool perk_filter(Perk const *perk) {
+  return strings_equal(perk_get_name(perk), "MentalAugmented") || strings_equal(perk_get_name(perk), "NightVision");
+}
+
+void entity_perks_test(void) {
+  EntityBuilder *builder = entity_builder_new();
+
+  Entity *entity = builder->with_name(builder, "Perked Entity")->with_xp(builder, 300)->build(builder, true);
+
+  CU_ASSERT_EQUAL(entity_perks_count(entity), 0);
+
+  const char *stuff[] = {
+    "MentalAugmented",
+    "LifeAugmented",
+    "NightVision",
+    "Robustness",
+  };
+
+  for (uint8_t i = 0; i < 4; i++) {
+    entity_perks_add(entity, perk_new(PT_ITEMS_STATS, stuff[i]));
+  }
+
+  CU_ASSERT_EQUAL(entity_perks_count(entity), 4);
+  CU_ASSERT_TRUE(entity_perks_has_perk(entity, "NightVision"));
+  CU_ASSERT_TRUE(entity_perks_has_perk(entity, "LifeAugmented"));
+  CU_ASSERT_FALSE(entity_perks_has_perk(entity, "NonExisting"));
+
+  Perk const *night_vision = entity_perks_get(entity, "NightVision");
+  CU_ASSERT_PTR_NOT_NULL(night_vision);
+  CU_ASSERT_EQUAL(perk_get_perk_type(night_vision), PT_ITEMS_STATS);
+
+  CU_ASSERT_PTR_NULL(entity_perks_get(entity, "NotExisting"));
+
+  size_t filtered_list_size;
+  Perk **filtered = entity_perks_filter(entity, &perk_filter, &filtered_list_size);
+
+  CU_ASSERT_EQUAL(filtered_list_size, 2);
+  CU_ASSERT_TRUE(strings_equal(perk_get_name(filtered[0]), "MentalAugmented"));
+  CU_ASSERT_TRUE(strings_equal(perk_get_name(filtered[1]), "NightVision"));
+
+  // Make sure we can walk the list either using nullptr termination or in a classic way
+  for (size_t i = 0; i < filtered_list_size; i++) {
+    CU_ASSERT_PTR_NOT_NULL(filtered[i]);
+  }
+
+  size_t      count = 0;
+  Perk const *current_item = filtered[count];
+  while (current_item != nullptr) {
+    bool ma_bool = strings_equal(perk_get_name(current_item), "MentalAugmented");
+    bool nv_bool = strings_equal(perk_get_name(current_item), "NightVision");
+
+    CU_ASSERT_TRUE(ma_bool || nv_bool);
+    current_item = filtered[++count];
+  }
+
+  CU_ASSERT_EQUAL(count, 2);
+  free(filtered);
+
+  entity_free(entity);
+}
+
 void entity_test_suite() {
   CU_pSuite suite = CU_add_suite("Entity Tests", nullptr, nullptr);
   CU_add_test(suite, "Create a basic entity", &entity_creation_test);
@@ -452,6 +531,7 @@ void entity_test_suite() {
   CU_add_test(suite, "Serialization", &entity_serialization_test);
   CU_add_test(suite, "Deserialization", &entity_deserialize_test);
   CU_add_test(suite, "Inventory manipulation", &entity_inventory_test);
+  CU_add_test(suite, "Perks manipulation", &entity_perks_test);
   CU_add_test(suite, "Entity Builder", &entity_builder_test);
 }
 
