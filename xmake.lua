@@ -30,6 +30,7 @@ set_fpmodels("fast", "except")
 target("engine")
 set_kind("shared", { soname = true })
 add_files("src/*.c")
+add_files("src/collections/*.c")
 add_includedirs("src")
 target_end()
 
