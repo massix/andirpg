@@ -20,6 +20,7 @@
 // OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "entity.h"
+#include "collections/linked_list.h"
 #include "item.h"
 #include "logger.h"
 #include "perk.h"
@@ -52,22 +53,22 @@
 #endif
 
 struct Entity {
-  uint32_t   _lp;
-  uint32_t   _starting_lp;
-  uint32_t   _mental_health;
-  uint32_t   _starting_mental_health;
-  uint32_t   _hunger;
-  uint32_t   _thirst;
-  uint32_t   _tiredness;
-  uint32_t   _xp;
-  uint32_t   _current_level;
-  uint32_t   _hearing_distance;
-  uint32_t   _seeing_distance;
-  EntityType _type;
-  char      *_name;
-  Point     *_coords;
-  Item     **_inventory;
-  Perk     **_perks;
+  uint32_t    _lp;
+  uint32_t    _starting_lp;
+  uint32_t    _mental_health;
+  uint32_t    _starting_mental_health;
+  uint32_t    _hunger;
+  uint32_t    _thirst;
+  uint32_t    _tiredness;
+  uint32_t    _xp;
+  uint32_t    _current_level;
+  uint32_t    _hearing_distance;
+  uint32_t    _seeing_distance;
+  EntityType  _type;
+  char       *_name;
+  Point      *_coords;
+  Item      **_inventory;
+  LinkedList *_perks;
 };
 
 EntityBuilder *eb_with_type(EntityBuilder *self, EntityType type) {
@@ -157,8 +158,7 @@ Entity *eb_build(EntityBuilder *self, bool oneshot) {
   ent->_coords = point_new(self->x, self->y);
   ent->_inventory = calloc(1, sizeof(Item *));
   ent->_inventory[0] = nullptr;
-  ent->_perks = calloc(1, sizeof(Perk *));
-  ent->_perks[0] = nullptr;
+  ent->_perks = linked_list_new(32, (FreeFunction)&perk_free);
 
   if (oneshot) {
     entity_builder_free(self);
@@ -302,8 +302,7 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   }
 
   // TODO: work on perks serial/deserial
-  entity->_perks = calloc(1, sizeof(Perk *));
-  entity->_perks[0] = nullptr;
+  entity->_perks = linked_list_new(32, (FreeFunction)&perk_free);
 
   return entity;
 }
@@ -581,91 +580,68 @@ inline Item **entity_inventory_get(Entity const *entity) {
 }
 
 size_t entity_perks_count(const Entity *self) {
-  size_t      count = 0;
-  Perk const *ptr = self->_perks[count];
-
-  while (ptr != nullptr) {
-    ptr = self->_perks[++count];
-  }
-
-  return count;
+  return linked_list_count(self->_perks);
 }
 
 void entity_perks_add(Entity *self, Perk *perk) {
-  // Get first valid slot
-  size_t first_null = entity_perks_count(self);
-
-  // Need to take nullptr into account
-  self->_perks = realloc(self->_perks, (first_null + 2) * sizeof(Perk *));
-  self->_perks[first_null] = perk;
-  self->_perks[first_null + 1] = nullptr;
+  linked_list_add(self->_perks, perk);
 }
 
 void entity_perks_remove(Entity *self, const char *perk_name) {
+  if (linked_list_is_empty(self->_perks)) {
+    return;
+  }
+
   bool    perk_found = false;
   uint8_t perk_index = 0;
-  size_t  perk_count = entity_perks_count(self);
 
-  for (size_t i = 0; i < perk_count; i++) {
-    if (strings_equal(perk_get_name(self->_perks[i]), perk_name)) {
+  linked_list_iterator_reset(self->_perks);
+
+  for (Perk const *current = linked_list_iterator_next(self->_perks); current != nullptr;
+       current = linked_list_iterator_next(self->_perks)) {
+    if (strings_equal(perk_get_name(current), perk_name)) {
       perk_found = true;
-      perk_index = i;
+      break;
     }
+
+    perk_index++;
   }
 
   if (perk_found) {
-    perk_free(self->_perks[perk_index]);
-    self->_perks[perk_index] = self->_perks[perk_count - 1];
-    self->_perks[perk_count - 1] = nullptr;
-    self->_perks = realloc(self->_perks, perk_count * sizeof(Perk *));
+    linked_list_remove(self->_perks, perk_index);
   }
 }
 
 bool entity_perks_has_perk(Entity const *self, const char *perk_name) {
-  for (size_t i = 0; i < entity_perks_count(self); i++) {
-    if (strings_equal(perk_get_name(self->_perks[i]), perk_name)) {
+  linked_list_iterator_reset(self->_perks);
+  for (Perk const *current = linked_list_iterator_next(self->_perks); current != nullptr;
+       current = linked_list_iterator_next(self->_perks)) {
+    if (strings_equal(perk_get_name(current), perk_name)) {
       return true;
     }
-  }
+  };
 
   return false;
 }
 
 void entity_perks_clear(Entity *self) {
-  for (size_t i = 0; i < entity_perks_count(self); i++) {
-    perk_free(self->_perks[i]);
+  while (!linked_list_is_empty(self->_perks)) {
+    linked_list_remove(self->_perks, 0);
   }
 
-  self->_perks = realloc(self->_perks, 1 * sizeof(Perk *));
-  self->_perks[0] = nullptr;
-}
-
-Perk **entity_perks_get_all(Entity const *self) {
-  return self->_perks;
+  linked_list_memory_shrink(self->_perks);
 }
 
 Perk **entity_perks_filter(Entity const *self, bool (*filter_fn)(Perk const *), size_t *list_size) {
-  size_t items = 0;
-  Perk **result = calloc(1, sizeof(Perk *));
-  result[0] = nullptr;
-
-  for (size_t i = 0; i < entity_perks_count(self); i++) {
-    if (filter_fn(self->_perks[i])) {
-      items++;
-      result = realloc(result, (items + 1) * sizeof(Perk *));
-      result[items - 1] = self->_perks[i];
-      result[items] = nullptr;
-    }
-  }
-
-  *list_size = items;
-  return result;
+  return (Perk **)linked_list_find_all(self->_perks, (Comparator)filter_fn, list_size);
 }
 
 Perk const *entity_perks_get(Entity const *self, char const *perk_name) {
-  for (size_t i = 0; i < entity_perks_count(self); i++) {
-    if (strings_equal(perk_get_name(self->_perks[i]), perk_name)) {
-      return self->_perks[i];
+  linked_list_iterator_reset(self->_perks);
+  for (Perk const *current = linked_list_iterator_next(self->_perks); current != nullptr;
+       current = linked_list_iterator_next(self->_perks)) {
+    if (strings_equal(perk_get_name(current), perk_name)) {
+      return current;
     }
   }
 

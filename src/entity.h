@@ -137,7 +137,6 @@ void        entity_perks_add(Entity *, Perk *);
 void        entity_perks_remove(Entity *, char const *);
 bool        entity_perks_has_perk(Entity const *, char const *);
 void        entity_perks_clear(Entity *);
-Perk      **entity_perks_get_all(Entity const *);
 Perk      **entity_perks_filter(Entity const *, bool (*)(Perk const *), size_t *);
 Perk const *entity_perks_get(Entity const *, char const *);
 

@@ -144,12 +144,12 @@ void linked_list_lot_items(void) {
   uint iterations = 0;
   last = linked_list_get(list, linked_list_count(list) - 1);
   Entity const *last_iterated = nullptr;
+  linked_list_iterator_reset(list);
   for (Entity *current = linked_list_iterator_next(list); current != nullptr; current = linked_list_iterator_next(list)) {
     iterations++;
     last_iterated = current;
   }
 
-  linked_list_iterator_reset(list);
   CU_ASSERT_EQUAL(iterations, linked_list_count(list));
   CU_ASSERT_EQUAL(last_iterated, last);
 

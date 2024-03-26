@@ -499,6 +499,7 @@ void entity_perks_test(void) {
   }
 
   CU_ASSERT_EQUAL(count, 2);
+  free(filtered);
 
   entity_free(entity);
 }
