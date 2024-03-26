@@ -229,7 +229,7 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   LOG_INFO("Unmarshalling entity", 0);
   LOG_INFO("Validating map", 0);
 
-  assert(map->size == 15);
+  assert(map->size == 16);
 
 #define sma(t, f) serde_map_assert(map, MSGPACK_OBJECT_##t, f);
 
@@ -248,6 +248,7 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   sma(STR, "name");
   sma(ARRAY, "coords");
   sma(ARRAY, "inventory");
+  sma(ARRAY, "perks");
 
 #define smg(t, f) t f = *(t *)serde_map_get(map, MSGPACK_OBJECT_POSITIVE_INTEGER, #f);
 
@@ -301,8 +302,11 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
     entity->_inventory[i] = item_deserialize(&(inventory->ptr[i].via.map));
   }
 
-  // TODO: work on perks serial/deserial
+  msgpack_object_array const *perks = serde_map_get(map, MSGPACK_OBJECT_ARRAY, "perks");
   entity->_perks = linked_list_new(32, (FreeFunction)&perk_free);
+  for (uint i = 0; i < perks->size; i++) {
+    linked_list_add(entity->_perks, perk_deserialize(&(perks->ptr[i].via.map)));
+  }
 
   return entity;
 }
@@ -311,7 +315,7 @@ void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
   msgpack_packer packer;
   msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
 
-  msgpack_pack_map(&packer, 15);
+  msgpack_pack_map(&packer, 16);
 
 #define PACK_UINT(t, s)        \
   serde_pack_str(&packer, #t); \
@@ -343,6 +347,13 @@ void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
   msgpack_pack_array(&packer, inventory_count);
   for (uint32_t i = 0; i < inventory_count; i++) {
     item_serialize(ent->_inventory[i], buffer);
+  }
+
+  serde_pack_str(&packer, "perks");
+  msgpack_pack_array(&packer, linked_list_count(ent->_perks));
+  linked_list_iterator_reset(ent->_perks);
+  for (Perk const *current = linked_list_iterator_next(ent->_perks); current != nullptr; current = linked_list_iterator_next(ent->_perks)) {
+    perk_serialize(current, buffer);
   }
 }
 

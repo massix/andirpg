@@ -250,6 +250,9 @@ void entity_serialization_test() {
   entity_inventory_add_item(entity, armor_new("An armor", 30, 16, 50, 30, 4));
   entity_inventory_add_item(entity, item_new(FORAGE, "A fruit", 10, 30));
 
+  entity_perks_add(entity, perk_new(PT_ITEMS_STATS, "Mechanic"));
+  entity_perks_add(entity, perk_new(PT_ENTITY_STATS, "NightVision"));
+
   // Simulate something in the engine
   entity_hurt(entity, 12);
   entity_move(entity, 3, -4);
@@ -292,7 +295,7 @@ void entity_serialization_test() {
   CU_ASSERT_EQUAL(msgpack_unpacker_next(&unpacker, &result), MSGPACK_UNPACK_SUCCESS);
 
   CU_ASSERT_EQUAL(result.data.type, MSGPACK_OBJECT_MAP);
-  CU_ASSERT_EQUAL(result.data.via.map.size, 15);
+  CU_ASSERT_EQUAL(result.data.via.map.size, 16);
 
 #define serde_map_assert_with_value(type, ctype, field, expected_value)                            \
   {                                                                                                \
@@ -317,6 +320,7 @@ void entity_serialization_test() {
   serde_map_assert(&result.data.via.map, MSGPACK_OBJECT_STR, "name");
   serde_map_assert(&result.data.via.map, MSGPACK_OBJECT_ARRAY, "coords");
   serde_map_assert(&result.data.via.map, MSGPACK_OBJECT_ARRAY, "inventory");
+  serde_map_assert(&result.data.via.map, MSGPACK_OBJECT_ARRAY, "perks");
 
   msgpack_object_str const *name_str = serde_map_get(&result.data.via.map, MSGPACK_OBJECT_STR, "name");
   serde_assert_str(name_str, "Some random name");
@@ -330,6 +334,9 @@ void entity_serialization_test() {
   msgpack_object_array const *inventory = serde_map_get(&result.data.via.map, MSGPACK_OBJECT_ARRAY, "inventory");
   CU_ASSERT_EQUAL(inventory->size, 3);
 
+  msgpack_object_array const *perks = serde_map_get(&result.data.via.map, MSGPACK_OBJECT_ARRAY, "perks");
+  CU_ASSERT_EQUAL(perks->size, 2);
+
   msgpack_unpacker_destroy(&unpacker);
   msgpack_unpacked_destroy(&result);
   entity_free(entity);
@@ -342,6 +349,9 @@ void entity_deserialize_test(void) {
   entity_inventory_add_item(entity, armor_new("Hairy armor", 10, 10, 0, 0, 15));
   entity_inventory_add_item(entity, tool_new("Lighter", 1, 1, 1, 10));
   entity_inventory_add_item(entity, item_new(FORAGE, "An apple", 1, 1));
+
+  entity_perks_add(entity, perk_new(PT_ENVIRONMENT, "AlwaysLit"));
+  entity_perks_add(entity, perk_new(PT_ENTITY_STATS, "NeverTired"));
 
   entity_hurt(entity, 3);
   entity_serialize(entity, &buffer);
@@ -384,6 +394,13 @@ void entity_deserialize_test(void) {
     // We're not checking the whole item since that is already done in the item_test
     CU_ASSERT_EQUAL(item_get_type(entity_inventory[i]), item_get_type(rebuilt_inventory[i]));
   }
+
+  CU_ASSERT_EQUAL(entity_perks_count(entity), entity_perks_count(rebuilt));
+
+  Perk const *original_perk = entity_perks_get(entity, "AlwaysLit");
+  Perk const *rebuilt_perk = entity_perks_get(rebuilt, "AlwaysLit");
+  CU_ASSERT_PTR_NOT_NULL(original_perk);
+  CU_ASSERT_PTR_NOT_NULL(rebuilt_perk);
 
   msgpack_unpacker_destroy(&unpacker);
   msgpack_sbuffer_destroy(&buffer);
