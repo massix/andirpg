@@ -295,7 +295,7 @@ void entity_serialization_test() {
   CU_ASSERT_EQUAL(msgpack_unpacker_next(&unpacker, &result), MSGPACK_UNPACK_SUCCESS);
 
   CU_ASSERT_EQUAL(result.data.type, MSGPACK_OBJECT_MAP);
-  CU_ASSERT_EQUAL(result.data.via.map.size, 16);
+  CU_ASSERT_EQUAL(result.data.via.map.size, 17);
 
 #define serde_map_assert_with_value(type, ctype, field, expected_value)                            \
   {                                                                                                \

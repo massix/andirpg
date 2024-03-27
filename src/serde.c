@@ -52,6 +52,18 @@ msgpack_object_kv const *serde_map_find(msgpack_object_map const *mp_map, msgpac
   return ret;
 }
 
+msgpack_object_kv const *serde_map_find_l(msgpack_object_map const *mp_map, char const *key) {
+  msgpack_object_kv *ret = nullptr;
+  for (uint i = 0; i < mp_map->size; i++) {
+    if (mp_map->ptr[i].key.type == MSGPACK_OBJECT_STR && serde_str_equal(&mp_map->ptr[i].key.via.str, key)) {
+      ret = &mp_map->ptr[i];
+      break;
+    }
+  }
+
+  return ret;
+}
+
 void const *serde_map_get(msgpack_object_map const *map, msgpack_object_type type, char const *key) {
   void const *ret = nullptr;
 

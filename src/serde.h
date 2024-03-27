@@ -47,6 +47,11 @@ void serde_assert_str(msgpack_object_str const *, char const *);
  */
 msgpack_object_kv const *serde_map_find(msgpack_object_map const *, msgpack_object_type, char const *);
 
+/**
+ * Similar to the previous function, but without the type check
+ */
+msgpack_object_kv const *serde_map_find_l(msgpack_object_map const *, char const *);
+
 /*
  * Returns a direct pointer to the val of a kv in a msgpack map.
  * Returns nullptr if it does not exist

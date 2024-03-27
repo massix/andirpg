@@ -131,6 +131,9 @@ void   entity_inventory_clear(Entity *);
 Item **entity_inventory_filter(Entity *, bool (*)(Item const *), ssize_t *);
 Item **entity_inventory_get(Entity const *); // PERF: Only useful for tests
 
+// Equipment methods
+Item *entity_equipment_get_head(Entity const *self);
+
 // Perks methods
 size_t      entity_perks_count(Entity const *);
 void        entity_perks_add(Entity *, Perk *);

@@ -47,10 +47,16 @@
     return self->_##prop_name;                              \
   }
 
-// This can be a compile-time constant?
-#ifndef MAX_INVENTORY_SIZE
-#define MAX_INVENTORY_SIZE 1024
-#endif
+typedef struct Equipment {
+  Item *_head;
+  Item *_neck;
+  Item *_torso;
+  Item *_left_hand;
+  Item *_right_hand;
+  Item *_legs;
+  Item *_left_foot;
+  Item *_right_foot;
+} Equipment;
 
 struct Entity {
   uint32_t    _lp;
@@ -69,7 +75,110 @@ struct Entity {
   Point      *_coords;
   Item      **_inventory;
   LinkedList *_perks;
+  Equipment  *_equipment;
 };
+
+Equipment *equipment_new() {
+  Equipment *self = calloc(1, sizeof(Equipment));
+  self->_head = nullptr;
+  self->_neck = nullptr;
+  self->_torso = nullptr;
+  self->_left_hand = nullptr;
+  self->_right_hand = nullptr;
+  self->_legs = nullptr;
+  self->_left_foot = nullptr;
+  self->_right_foot = nullptr;
+
+  return self;
+}
+
+void equipment_free(Equipment *self) {
+#define free_nonnull(p) \
+  if ((p) != nullptr)   \
+    item_free(p);
+
+  free_nonnull(self->_head);
+  free_nonnull(self->_neck);
+  free_nonnull(self->_torso);
+  free_nonnull(self->_left_hand);
+  free_nonnull(self->_right_hand);
+  free_nonnull(self->_legs);
+  free_nonnull(self->_left_foot);
+  free_nonnull(self->_right_foot);
+}
+
+void equipment_serialize(Equipment const *self, msgpack_sbuffer *buffer) {
+  msgpack_packer *packer = msgpack_packer_new(buffer, &msgpack_sbuffer_write);
+  msgpack_pack_map(packer, 8);
+
+#define serialize_part(part)               \
+  serde_pack_str(packer, #part);           \
+  if (self->_##part != nullptr)            \
+    item_serialize(self->_##part, buffer); \
+  else                                     \
+    msgpack_pack_nil(packer);
+
+  serialize_part(head);
+  serialize_part(neck);
+  serialize_part(torso);
+  serialize_part(left_hand);
+  serialize_part(right_hand);
+  serialize_part(legs);
+  serialize_part(left_foot);
+  serialize_part(right_foot);
+
+  msgpack_packer_free(packer);
+}
+
+Equipment *equipment_deserialize(msgpack_object_map const *map) {
+  assert(map->size == 8);
+
+  Equipment *self = equipment_new();
+
+#define deserialize_part(part)                                       \
+  msgpack_object_kv const *kv_##part = serde_map_find_l(map, #part); \
+  if (kv_##part->val.type == MSGPACK_OBJECT_MAP) {                   \
+    self->_##part = item_deserialize(&kv_##part->val.via.map);       \
+  }
+
+  deserialize_part(head);
+  deserialize_part(neck);
+  deserialize_part(torso);
+  deserialize_part(left_hand);
+  deserialize_part(right_hand);
+  deserialize_part(legs);
+  deserialize_part(left_foot);
+  deserialize_part(right_foot);
+
+  return self;
+}
+
+#define EQUIPMENT_GETTER(part)                        \
+  Item *equipment_get_##part(Equipment const *self) { \
+    return self->_##part;                             \
+  }
+
+#define EQUIPMENT_SETTER(part)                             \
+  void equipment_set_##part(Equipment *self, Item *item) { \
+    self->_##part = item;                                  \
+  }
+
+EQUIPMENT_GETTER(head);
+EQUIPMENT_SETTER(head);
+EQUIPMENT_GETTER(neck);
+EQUIPMENT_SETTER(neck);
+EQUIPMENT_GETTER(torso);
+EQUIPMENT_SETTER(torso);
+EQUIPMENT_GETTER(left_hand);
+EQUIPMENT_SETTER(left_hand);
+EQUIPMENT_GETTER(right_hand);
+EQUIPMENT_SETTER(right_hand);
+EQUIPMENT_GETTER(legs);
+EQUIPMENT_SETTER(legs);
+EQUIPMENT_GETTER(left_foot);
+EQUIPMENT_SETTER(left_foot);
+EQUIPMENT_GETTER(right_foot);
+EQUIPMENT_SETTER(right_foot);
 
 EntityBuilder *eb_with_type(EntityBuilder *self, EntityType type) {
   self->type = type;
@@ -159,6 +268,7 @@ Entity *eb_build(EntityBuilder *self, bool oneshot) {
   ent->_inventory = calloc(1, sizeof(Item *));
   ent->_inventory[0] = nullptr;
   ent->_perks = linked_list_new(32, (FreeFunction)&perk_free);
+  ent->_equipment = equipment_new();
 
   if (oneshot) {
     entity_builder_free(self);
@@ -229,7 +339,7 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   LOG_INFO("Unmarshalling entity", 0);
   LOG_INFO("Validating map", 0);
 
-  assert(map->size == 16);
+  assert(map->size == 17);
 
 #define sma(t, f) serde_map_assert(map, MSGPACK_OBJECT_##t, f);
 
@@ -247,6 +357,7 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   sma(POSITIVE_INTEGER, "type");
   sma(STR, "name");
   sma(ARRAY, "coords");
+  sma(MAP, "equipment");
   sma(ARRAY, "inventory");
   sma(ARRAY, "perks");
 
@@ -294,6 +405,9 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   entity->_name = calloc(name_ptr->size, sizeof(char));
   memcpy(entity->_name, name_ptr->ptr, name_ptr->size);
 
+  msgpack_object_map const *equipment = serde_map_get(map, MSGPACK_OBJECT_MAP, "equipment");
+  entity->_equipment = equipment_deserialize(equipment);
+
   msgpack_object_array const *inventory = serde_map_get(map, MSGPACK_OBJECT_ARRAY, "inventory");
 
   entity->_inventory = calloc(inventory->size + 1 /* for the null pointer */, sizeof(Item *));
@@ -308,6 +422,8 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
     linked_list_add(entity->_perks, perk_deserialize(&(perks->ptr[i].via.map)));
   }
 
+  entity->_equipment = equipment_new();
+
   return entity;
 }
 
@@ -315,7 +431,7 @@ void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
   msgpack_packer packer;
   msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
 
-  msgpack_pack_map(&packer, 16);
+  msgpack_pack_map(&packer, 17);
 
 #define PACK_UINT(t, s)        \
   serde_pack_str(&packer, #t); \
@@ -342,6 +458,9 @@ void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
   msgpack_pack_uint32(&packer, point_get_x(ent->_coords));
   msgpack_pack_uint32(&packer, point_get_y(ent->_coords));
 
+  serde_pack_str(&packer, "equipment");
+  equipment_serialize(ent->_equipment, buffer);
+
   serde_pack_str(&packer, "inventory");
   uint32_t inventory_count = entity_inventory_count(ent);
   msgpack_pack_array(&packer, inventory_count);
@@ -365,8 +484,8 @@ void entity_free(Entity *entity) {
   entity_inventory_clear(entity);
   free(entity->_inventory);
 
-  entity_perks_clear(entity);
-  free(entity->_perks);
+  linked_list_free(entity->_perks);
+  equipment_free(entity->_equipment);
 
   free(entity);
 }
