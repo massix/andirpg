@@ -79,5 +79,8 @@ uint8_t  armor_get_armor_class(ArmorProperties const *);
 void item_set_coords(Item *, uint32_t x, uint32_t y);
 void item_clear_coords(Item *);
 
+// Methods
+bool item_is_equal(Item const *self, Item const *other);
+
 #endif
 
