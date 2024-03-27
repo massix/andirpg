@@ -521,6 +521,79 @@ void entity_perks_test(void) {
   entity_free(entity);
 }
 
+void entity_equipment_test(void) {
+  Entity *entity = entity_build(10, HUMAN, "Human", 0, 0);
+  entity_inventory_add_item(entity, weapon_new("One handed", 10, 0, 1, 10, 10));
+  entity_inventory_add_item(entity, weapon_new("One handed bis", 10, 0, 1, 10, 10));
+  entity_inventory_add_item(entity, weapon_new("Two handed", 10, 0, 2, 10, 10));
+  entity_inventory_add_item(entity, armor_new("Helmet", 1, 0, 0, 10, 2));
+  entity_inventory_add_item(entity, armor_new("Necklace", 1, 0, 2, 10, 3));
+  entity_inventory_add_item(entity, armor_new("T-Shirt", 1, 0, 2, 10, 3));
+  entity_inventory_add_item(entity, armor_new("Jeans", 3, 0, 1, 10, 0));
+  entity_inventory_add_item(entity, armor_new("Left shoe", 2, 0, 1, 10, 4));
+  entity_inventory_add_item(entity, armor_new("Right shoe", 2, 0, 1, 10, 4));
+  entity_inventory_add_item(entity, tool_new("Lighter", 0, 0, 1, 10));
+
+  CU_ASSERT_EQUAL(entity_inventory_count(entity), 10);
+
+  // One handed and two handed weapons
+  entity_equipment_set_left_hand(entity, "One handed");
+  CU_ASSERT_PTR_NOT_NULL(entity_equipment_get_left_hand(entity));
+  CU_ASSERT_EQUAL(entity_inventory_count(entity), 9);
+
+  entity_equipment_set_right_hand(entity, "One handed bis");
+  CU_ASSERT_PTR_NOT_NULL(entity_equipment_get_right_hand(entity));
+  CU_ASSERT_EQUAL(entity_inventory_count(entity), 8);
+
+  entity_equipment_unset_right_hand(entity);
+  entity_equipment_unset_left_hand(entity);
+  CU_ASSERT_PTR_NULL(entity_equipment_get_left_hand(entity));
+  CU_ASSERT_PTR_NULL(entity_equipment_get_right_hand(entity));
+  CU_ASSERT_EQUAL(entity_inventory_count(entity), 10);
+
+  entity_equipment_set_left_hand(entity, "Two handed");
+  CU_ASSERT_PTR_NOT_NULL(entity_equipment_get_left_hand(entity));
+  CU_ASSERT_EQUAL(entity_inventory_count(entity), 9);
+
+  // Cannot equip to right hand since we already have two handed in left hand
+  entity_equipment_set_right_hand(entity, "One handed");
+  CU_ASSERT_PTR_NULL(entity_equipment_get_right_hand(entity));
+  CU_ASSERT_EQUAL(entity_inventory_count(entity), 9);
+
+  entity_equipment_unset_left_hand(entity);
+  CU_ASSERT_EQUAL(entity_inventory_count(entity), 10);
+
+  // Trying to equip 2-handed in right hand should equip to left hand instead
+  entity_equipment_set_right_hand(entity, "Two handed");
+  CU_ASSERT_PTR_NULL(entity_equipment_get_right_hand(entity));
+  CU_ASSERT_PTR_NOT_NULL(entity_equipment_get_left_hand(entity));
+  CU_ASSERT_EQUAL(entity_inventory_count(entity), 9);
+
+  entity_equipment_unset_left_hand(entity);
+  CU_ASSERT_EQUAL(entity_inventory_count(entity), 10);
+
+  // Trying to equip an armor in hand should result in a failure
+  entity_equipment_set_left_hand(entity, "Necklace");
+  CU_ASSERT_PTR_NULL(entity_equipment_get_left_hand(entity));
+  CU_ASSERT_EQUAL(entity_inventory_count(entity), 10);
+
+  // Trying to wear a weapon should result in a failure
+  entity_equipment_set_head(entity, "Two handed");
+  CU_ASSERT_PTR_NULL(entity_equipment_get_head(entity));
+  CU_ASSERT_EQUAL(entity_inventory_count(entity), 10);
+
+  // Wear full armor
+  entity_equipment_set_head(entity, "Helmet");
+  entity_equipment_set_neck(entity, "Necklace");
+  entity_equipment_set_torso(entity, "T-Shirt");
+  entity_equipment_set_legs(entity, "Jeans");
+  entity_equipment_set_left_foot(entity, "Left shoe");
+  entity_equipment_set_right_foot(entity, "Right shoe");
+  CU_ASSERT_EQUAL(entity_inventory_count(entity), 4);
+
+  entity_free(entity);
+}
+
 void entity_test_suite() {
   CU_pSuite suite = CU_add_suite("Entity Tests", nullptr, nullptr);
   CU_add_test(suite, "Create a basic entity", &entity_creation_test);
@@ -531,6 +604,7 @@ void entity_test_suite() {
   CU_add_test(suite, "Serialization", &entity_serialization_test);
   CU_add_test(suite, "Deserialization", &entity_deserialize_test);
   CU_add_test(suite, "Inventory manipulation", &entity_inventory_test);
+  CU_add_test(suite, "Equipment manipulation", &entity_equipment_test);
   CU_add_test(suite, "Perks manipulation", &entity_perks_test);
   CU_add_test(suite, "Entity Builder", &entity_builder_test);
 }
