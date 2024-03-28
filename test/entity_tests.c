@@ -31,6 +31,7 @@ void entity_creation_test(void) {
   CU_ASSERT_EQUAL(entity_get_entity_type(human), HUMAN);
   CU_ASSERT_EQUAL(entity_get_life_points(human), 30);
   CU_ASSERT_EQUAL(entity_get_entity_type(human), HUMAN);
+  CU_ASSERT_EQUAL(entity_get_strength(human), 10);
 
   Point const *entity_coords = entity_get_coords(human);
   CU_ASSERT_EQUAL(point_get_x(entity_coords), 20);
@@ -295,7 +296,7 @@ void entity_serialization_test() {
   CU_ASSERT_EQUAL(msgpack_unpacker_next(&unpacker, &result), MSGPACK_UNPACK_SUCCESS);
 
   CU_ASSERT_EQUAL(result.data.type, MSGPACK_OBJECT_MAP);
-  CU_ASSERT_EQUAL(result.data.via.map.size, 17);
+  CU_ASSERT_EQUAL(result.data.via.map.size, 18);
 
 #define serde_map_assert_with_value(type, ctype, field, expected_value)                            \
   {                                                                                                \
@@ -308,6 +309,7 @@ void entity_serialization_test() {
   serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, starting_lp, 30);
   serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, mental_health, 30);
   serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, starting_mental_health, 30);
+  serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, strength, 10);
   serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, hunger, 0);
   serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, thirst, 0);
   serde_map_assert_with_value(POSITIVE_INTEGER, uint32_t, tiredness, 0);
@@ -377,6 +379,7 @@ void entity_deserialize_test(void) {
   CU_ASSERT_ENTITY_PROP(get_starting_life_points);
   CU_ASSERT_ENTITY_PROP(get_mental_health);
   CU_ASSERT_ENTITY_PROP(get_starting_mental_health);
+  CU_ASSERT_ENTITY_PROP(get_strength);
   CU_ASSERT_ENTITY_PROP(get_hunger);
   CU_ASSERT_ENTITY_PROP(get_thirst);
   CU_ASSERT_ENTITY_PROP(get_tiredness);
@@ -386,6 +389,7 @@ void entity_deserialize_test(void) {
   CU_ASSERT_ENTITY_PROP(get_seeing_distance);
   CU_ASSERT_ENTITY_PROP(get_entity_type);
   CU_ASSERT_ENTITY_PROP(inventory_count);
+  CU_ASSERT_ENTITY_PROP(perks_count);
 
   Item **entity_inventory = entity_inventory_get(entity);
   Item **rebuilt_inventory = entity_inventory_get(rebuilt);
@@ -419,6 +423,7 @@ void entity_builder_test(void) {
     ->with_type(builder, ANIMAL)
     ->with_xp(builder, starting_xp)
     ->with_life_points(builder, 5)
+    ->with_strength(builder, 5)
     ->with_mental_health(builder, 10)
     ->with_hearing_distance(builder, 100)
     ->with_level(builder, 1);
@@ -440,6 +445,7 @@ void entity_builder_test(void) {
     CU_ASSERT_EQUAL(entity_get_xp(entity), starting_xp + 10);
     CU_ASSERT_EQUAL(entity_get_life_points(entity), 5);
     CU_ASSERT_EQUAL(entity_get_mental_health(entity), 10);
+    CU_ASSERT_EQUAL(entity_get_strength(entity), 5);
     CU_ASSERT_EQUAL(entity_get_hearing_distance(entity), 100);
     CU_ASSERT_EQUAL(entity_get_seeing_distance(entity), 1);
     CU_ASSERT_EQUAL(entity_get_entity_type(entity), ANIMAL);

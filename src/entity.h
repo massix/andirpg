@@ -55,6 +55,7 @@ typedef struct EntityBuilder {
   uint32_t   hunger;           // Default: 0
   uint32_t   thirst;           // Default: 0
   uint32_t   tiredness;        // Default: 0
+  uint32_t   strength;         // Default: 10
   char      *name;             // Default: nullptr (MANDATORY)
 
   struct EntityBuilder *(*with_type)(struct EntityBuilder *, EntityType);
@@ -69,6 +70,7 @@ typedef struct EntityBuilder {
   struct EntityBuilder *(*with_hunger)(struct EntityBuilder *, uint32_t);
   struct EntityBuilder *(*with_thirst)(struct EntityBuilder *, uint32_t);
   struct EntityBuilder *(*with_tiredness)(struct EntityBuilder *, uint32_t);
+  struct EntityBuilder *(*with_strength)(struct EntityBuilder *, uint32_t);
   Entity *(*build)(struct EntityBuilder *, bool oneshot);
 } EntityBuilder;
 
@@ -96,6 +98,7 @@ uint32_t     entity_get_xp(Entity const *);
 uint32_t     entity_get_current_level(Entity const *);
 uint32_t     entity_get_hearing_distance(Entity const *);
 uint32_t     entity_get_seeing_distance(Entity const *);
+uint32_t     entity_get_strength(Entity const *);
 EntityType   entity_get_entity_type(Entity const *);
 const char  *entity_get_name(Entity const *);
 Point const *entity_get_coords(Entity const *);

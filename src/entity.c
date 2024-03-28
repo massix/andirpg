@@ -63,6 +63,7 @@ struct Entity {
   uint32_t    _starting_lp;
   uint32_t    _mental_health;
   uint32_t    _starting_mental_health;
+  uint32_t    _strength;
   uint32_t    _hunger;
   uint32_t    _thirst;
   uint32_t    _tiredness;
@@ -261,6 +262,11 @@ EntityBuilder *eb_with_tiredness(EntityBuilder *self, uint32_t tiredness) {
   return self;
 }
 
+EntityBuilder *eb_with_strength(EntityBuilder *self, uint32_t strength) {
+  self->strength = strength;
+  return self;
+}
+
 Entity *eb_build(EntityBuilder *self, bool oneshot) {
   if (self->name == nullptr) {
     panic("Cannot build an entity without a name!", EC_ENTITY_EMPTY_NAME);
@@ -271,6 +277,7 @@ Entity *eb_build(EntityBuilder *self, bool oneshot) {
   ent->_starting_lp = self->life_points;
   ent->_mental_health = self->mental_health;
   ent->_starting_mental_health = self->mental_health;
+  ent->_strength = self->strength;
   ent->_hunger = self->hunger;
   ent->_thirst = self->thirst;
   ent->_tiredness = self->tiredness;
@@ -306,6 +313,7 @@ EntityBuilder *entity_builder_new() {
   builder->xp = 0;
   builder->hearing_distance = 10;
   builder->seeing_distance = 10;
+  builder->strength = 10;
   builder->x = 0;
   builder->y = 0;
   builder->hunger = 0;
@@ -316,6 +324,7 @@ EntityBuilder *entity_builder_new() {
   builder->with_type = &eb_with_type;
   builder->with_life_points = &eb_with_lp;
   builder->with_mental_health = &eb_with_mh;
+  builder->with_strength = &eb_with_strength;
   builder->with_level = &eb_with_level;
   builder->with_xp = &eb_with_xp;
   builder->with_hearing_distance = &eb_with_hd;
@@ -355,7 +364,7 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   LOG_INFO("Unmarshalling entity", 0);
   LOG_INFO("Validating map", 0);
 
-  assert(map->size == 17);
+  assert(map->size == 18);
 
 #define sma(t, f) serde_map_assert(map, MSGPACK_OBJECT_##t, f);
 
@@ -363,6 +372,7 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   sma(POSITIVE_INTEGER, "starting_lp");
   sma(POSITIVE_INTEGER, "mental_health");
   sma(POSITIVE_INTEGER, "starting_mental_health");
+  sma(POSITIVE_INTEGER, "strength");
   sma(POSITIVE_INTEGER, "hunger");
   sma(POSITIVE_INTEGER, "thirst");
   sma(POSITIVE_INTEGER, "tiredness");
@@ -387,6 +397,7 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   smg(uint32_t, hunger);
   smg(uint32_t, thirst);
   smg(uint32_t, tiredness);
+  smg(uint32_t, strength);
   smg(uint32_t, xp);
   smg(uint32_t, current_level);
   smg(uint32_t, hearing_distance);
@@ -409,6 +420,7 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   assign(hunger);
   assign(thirst);
   assign(tiredness);
+  assign(strength);
   assign(xp);
   assign(current_level);
   assign(hearing_distance);
@@ -445,7 +457,7 @@ void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
   msgpack_packer packer;
   msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
 
-  msgpack_pack_map(&packer, 17);
+  msgpack_pack_map(&packer, 18);
 
 #define PACK_UINT(t, s)        \
   serde_pack_str(&packer, #t); \
@@ -455,6 +467,7 @@ void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
   PACK_UINT(starting_lp, 32);
   PACK_UINT(mental_health, 32);
   PACK_UINT(starting_mental_health, 32);
+  PACK_UINT(strength, 32);
   PACK_UINT(hunger, 32);
   PACK_UINT(thirst, 32);
   PACK_UINT(tiredness, 32);
@@ -514,6 +527,7 @@ inline uint32_t entity_get_starting_life_points(Entity const *entity) {
 
 GENERATE_GETTER(uint32_t, mental_health);
 GENERATE_GETTER(uint32_t, starting_mental_health);
+GENERATE_GETTER(uint32_t, strength);
 GENERATE_GETTER(uint32_t, hunger);
 GENERATE_GETTER(uint32_t, thirst);
 GENERATE_GETTER(uint32_t, tiredness);
