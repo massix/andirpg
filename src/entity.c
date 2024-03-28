@@ -74,7 +74,7 @@ struct Entity {
   EntityType  _type;
   char       *_name;
   Point      *_coords;
-  Item      **_inventory;
+  LinkedList *_inventory;
   LinkedList *_perks;
   Equipment  *_equipment;
 };
@@ -288,8 +288,7 @@ Entity *eb_build(EntityBuilder *self, bool oneshot) {
   ent->_type = self->type;
   ent->_name = strdup(self->name);
   ent->_coords = point_new(self->x, self->y);
-  ent->_inventory = calloc(1, sizeof(Item *));
-  ent->_inventory[0] = nullptr;
+  ent->_inventory = linked_list_new(32, (FreeFunction)&item_free);
   ent->_perks = linked_list_new(32, (FreeFunction)&perk_free);
   ent->_equipment = equipment_new();
 
@@ -437,11 +436,9 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   entity->_equipment = equipment_deserialize(equipment);
 
   msgpack_object_array const *inventory = serde_map_get(map, MSGPACK_OBJECT_ARRAY, "inventory");
-
-  entity->_inventory = calloc(inventory->size + 1 /* for the null pointer */, sizeof(Item *));
-  entity->_inventory[inventory->size] = nullptr;
+  entity->_inventory = linked_list_new(32, (FreeFunction)&item_free);
   for (uint i = 0; i < inventory->size; i++) {
-    entity->_inventory[i] = item_deserialize(&(inventory->ptr[i].via.map));
+    linked_list_add(entity->_inventory, item_deserialize(&(inventory->ptr[i].via.map)));
   }
 
   msgpack_object_array const *perks = serde_map_get(map, MSGPACK_OBJECT_ARRAY, "perks");
@@ -489,10 +486,12 @@ void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
   equipment_serialize(ent->_equipment, buffer);
 
   serde_pack_str(&packer, "inventory");
-  uint32_t inventory_count = entity_inventory_count(ent);
+  uint32_t inventory_count = linked_list_count(ent->_inventory);
   msgpack_pack_array(&packer, inventory_count);
-  for (uint32_t i = 0; i < inventory_count; i++) {
-    item_serialize(ent->_inventory[i], buffer);
+  linked_list_iterator_reset(ent->_inventory);
+  for (Item const *current = linked_list_iterator_next(ent->_inventory); current != nullptr;
+       current = linked_list_iterator_next(ent->_inventory)) {
+    item_serialize(current, buffer);
   }
 
   serde_pack_str(&packer, "perks");
@@ -508,8 +507,7 @@ void entity_free(Entity *entity) {
 
   point_free(entity->_coords);
 
-  entity_inventory_clear(entity);
-  free(entity->_inventory);
+  linked_list_free(entity->_inventory);
 
   linked_list_free(entity->_perks);
   equipment_free(entity->_equipment);
@@ -650,91 +648,53 @@ size_t entity_inventory_count(Entity const *entity) {
 }
 
 void entity_inventory_add_item(Entity *entity, Item *item) {
-  size_t current_count = entity_inventory_count(entity) + 1; // include the nullptr
   LOG_INFO("Adding item '%s' to '%s'", item_get_name(item), entity_get_name(entity));
-
-  // current_count + 1 adds a new "slot"
-  entity->_inventory = realloc(entity->_inventory, (current_count + 1) * sizeof(Item *));
-
-  // current_count - 1 is the old nullptr
-  entity->_inventory[current_count - 1] = item;
-  entity->_inventory[current_count] = nullptr;
+  linked_list_add(entity->_inventory, item);
 }
 
-// When removing an item from the inventory, we will replace the empty slot with the last item of the inventory
-// Example:
-// Inventory contains:
-// 0. a potion
-// 1. a sword
-// 2. a dagger
-// 3. an armor
-//
-// We want to remove a sword, the new inventory will be:
-// 0. a potion
-// 1. an armor (was number 4, now is number 2)
-// 2. a dagger
-void entity_inventory_remove_item(Entity *entity, const char *item_name) {
-  bool    need_cleaning = false;
-  ssize_t item_index = -1;
-  size_t  total_items = entity_inventory_count(entity);
-  LOG_INFO("Removing item '%s' from '%s'", item_name, entity_get_name(entity));
-
-  for (ssize_t i = 0; i < total_items; i++) {
-    if (strings_equal(item_get_name(entity->_inventory[i]), item_name)) {
-      LOG_DEBUG("Item found, removing", 0);
-      item_index = i;
-      item_free(entity->_inventory[i]);
-      entity->_inventory[i] = nullptr;
-      need_cleaning = i < (total_items - 1) && entity->_inventory[i + 1] != nullptr;
+void entity_inventory_remove_item(Entity *self, const char *item_name) {
+  uint32_t item_index = 0;
+  bool     item_found = false;
+  linked_list_iterator_reset(self->_inventory);
+  for (Item const *item = linked_list_iterator_next(self->_inventory); item != nullptr;
+       item = linked_list_iterator_next(self->_inventory)) {
+    if (strings_equal(item_get_name(item), item_name)) {
+      item_found = true;
       break;
     }
+
+    item_index++;
   }
 
-  if (need_cleaning) {
-    LOG_DEBUG("Cleaning inventory after removal of item", 0);
-    entity->_inventory[item_index] = entity->_inventory[total_items - 1];
-    entity->_inventory[total_items - 1] = nullptr;
-  }
-
-  if (item_index != -1) {
-    entity->_inventory = realloc(entity->_inventory, (total_items - 1) * sizeof(Item *));
+  if (item_found) {
+    linked_list_remove(self->_inventory, item_index);
   }
 }
 
 void entity_inventory_clear(Entity *entity) {
-  size_t current_index = 0;
-  Item  *pointed_item = entity->_inventory[current_index];
-  LOG_DEBUG("Cleaning inventory for '%s'", entity_get_name(entity));
-
-  while (pointed_item != nullptr) {
-    item_free(pointed_item);
-    pointed_item = entity->_inventory[++current_index];
+  Item const *current = linked_list_get(entity->_inventory, 0);
+  while (current != nullptr) {
+    linked_list_remove(entity->_inventory, 0);
+    current = linked_list_get(entity->_inventory, 0);
   }
-
-  entity->_inventory = realloc(entity->_inventory, 1 * sizeof(Item *));
-  entity->_inventory[0] = nullptr;
 }
 
-Item **entity_inventory_filter(Entity *entity, bool (*filter_function)(Item const *), ssize_t *items_found) {
-  Item **elements = calloc(entity_inventory_count(entity), sizeof(Item *));
-  *items_found = 0;
-  ssize_t current_index = 0;
-
-  Item *current_item = entity->_inventory[current_index];
-  while (current_item != nullptr) {
-    if (filter_function(current_item)) {
-      elements[*items_found] = current_item;
-      (*items_found)++;
-    }
-
-    current_item = entity->_inventory[++current_index];
-  }
-
-  return elements;
+Item **entity_inventory_filter(Entity *entity, bool (*filter_function)(Item const *), size_t *items_found) {
+  return (Item **)linked_list_find_all(entity->_inventory, (Comparator)filter_function, items_found);
 }
 
 inline Item **entity_inventory_get(Entity const *entity) {
-  return entity->_inventory;
+  Item **ret_list;
+  ret_list = calloc(linked_list_count(entity->_inventory), sizeof(Item *));
+  linked_list_iterator_reset(entity->_inventory);
+
+  uint32_t index = 0;
+  for (Item *current = linked_list_iterator_next(entity->_inventory); current != nullptr;
+       current = linked_list_iterator_next(entity->_inventory)) {
+    ret_list[index++] = current;
+  }
+
+  return ret_list;
 }
 
 // Private method
@@ -742,18 +702,21 @@ Item *entity_inventory_pop(Entity *self, char const *name, ItemType type) {
   uint  index = 0;
   Item *new_item = nullptr;
 
-  Item const *iterator = self->_inventory[index];
+  linked_list_iterator_reset(self->_inventory);
+
+  Item const *iterator = linked_list_iterator_next(self->_inventory);
   while (iterator != nullptr) {
     if (strings_equal(item_get_name(iterator), name) && item_get_type(iterator) == type) {
       break;
     }
 
-    iterator = self->_inventory[++index];
+    iterator = linked_list_iterator_next(self->_inventory);
+    index++;
   }
 
   if (iterator != nullptr) {
     new_item = item_clone(iterator);
-    entity_inventory_remove_item(self, name);
+    linked_list_remove(self->_inventory, index);
   }
 
   return new_item;

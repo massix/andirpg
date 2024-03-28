@@ -131,7 +131,7 @@ size_t entity_inventory_count(Entity const *);
 void   entity_inventory_add_item(Entity *, Item *);
 void   entity_inventory_remove_item(Entity *, const char *);
 void   entity_inventory_clear(Entity *);
-Item **entity_inventory_filter(Entity *, bool (*)(Item const *), ssize_t *);
+Item **entity_inventory_filter(Entity *, bool (*)(Item const *), size_t *);
 Item **entity_inventory_get(Entity const *); // PERF: Only useful for tests
 
 // Equipment methods

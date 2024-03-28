@@ -200,34 +200,29 @@ void entity_inventory_test(void) {
   entity_inventory_add_item(entity, weapon_new("Weapn with a typo (should not be filtered)", 30, 20, 1, 10, 10));
   CU_ASSERT_EQUAL(entity_inventory_count(entity), 9);
 
-  ssize_t retrieved_weapons = 0;
-  Item  **weapons = entity_inventory_filter(entity, &filter_weapons, &retrieved_weapons);
+  size_t retrieved_weapons = 0;
+  Item **weapons = entity_inventory_filter(entity, &filter_weapons, &retrieved_weapons);
   CU_ASSERT_EQUAL(retrieved_weapons, 4);
 
-  ssize_t retrieved_tools = 0;
-  Item  **tools = entity_inventory_filter(entity, &filter_tools, &retrieved_tools);
+  size_t retrieved_tools = 0;
+  Item **tools = entity_inventory_filter(entity, &filter_tools, &retrieved_tools);
   CU_ASSERT_EQUAL(retrieved_tools, 3);
 
-  ssize_t retrieved_none = -1;
-  Item  **nothing = entity_inventory_filter(entity, &filter_none, &retrieved_none);
+  size_t retrieved_none = -1;
+  Item **nothing = entity_inventory_filter(entity, &filter_none, &retrieved_none);
   CU_ASSERT_EQUAL(retrieved_none, 0);
-
-  Item **all_inventory = entity_inventory_get(entity);
 
   // Remove item in the middle
   entity_inventory_remove_item(entity, "Heal Potion");
   CU_ASSERT_EQUAL(entity_inventory_count(entity), 8);
-  CU_ASSERT_TRUE(strings_equal(item_get_name(all_inventory[5]), "Weapn with a typo (should not be filtered)"));
 
   // Remove first item
   entity_inventory_remove_item(entity, "Weapon number one");
   CU_ASSERT_EQUAL(entity_inventory_count(entity), 7);
-  CU_ASSERT_TRUE(strings_equal(item_get_name(all_inventory[0]), "An armor I guess"));
 
   // Remove last item
   entity_inventory_remove_item(entity, "Weapn with a typo (should not be filtered)");
   CU_ASSERT_EQUAL(entity_inventory_count(entity), 6);
-  CU_ASSERT_TRUE(strings_equal(item_get_name(all_inventory[5]), "Weapon: a broadsword"));
 
   entity_inventory_clear(entity);
   CU_ASSERT_EQUAL(entity_inventory_count(entity), 0);
