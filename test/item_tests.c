@@ -382,6 +382,22 @@ void item_deserialize_test(void) {
   free(all_deserialized);
 }
 
+void item_equality_test(void) {
+  Item *armor1 = armor_new("Armor 1", 10, 10, 30, 10, 4);
+  Item *armor2 = armor_new("Armor 1", 10, 10, 30, 10, 4);
+  Item *tool1 = tool_new("Tool 1", 10, 1, 2, 10);
+  Item *tool2 = tool_new("Tool 1", 11, 1, 2, 10);
+
+  CU_ASSERT_TRUE(item_is_equal(armor1, armor2));
+  CU_ASSERT_FALSE(item_is_equal(tool1, tool2));
+  CU_ASSERT_FALSE(item_is_equal(armor1, tool1));
+
+  item_free(armor1);
+  item_free(armor2);
+  item_free(tool1);
+  item_free(tool2);
+}
+
 void item_test_suite() {
   CU_pSuite suite = CU_add_suite("Items Tests", nullptr, nullptr);
   CU_add_test(suite, "Item creation", &item_new_test);
@@ -390,5 +406,6 @@ void item_test_suite() {
   CU_add_test(suite, "Item clonation", &item_clone_test);
   CU_add_test(suite, "Item serialization", &item_serialize_test);
   CU_add_test(suite, "Item deserialization", &item_deserialize_test);
+  CU_add_test(suite, "Item equality", &item_equality_test);
 }
 

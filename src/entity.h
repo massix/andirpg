@@ -131,6 +131,32 @@ void   entity_inventory_clear(Entity *);
 Item **entity_inventory_filter(Entity *, bool (*)(Item const *), ssize_t *);
 Item **entity_inventory_get(Entity const *); // PERF: Only useful for tests
 
+// Equipment methods
+Item *entity_equipment_get_head(Entity const *self);
+void  entity_equipment_set_head(Entity *self, char const *item);
+void  entity_equipment_unset_head(Entity *self);
+Item *entity_equipment_get_neck(Entity const *self);
+void  entity_equipment_set_neck(Entity *self, char const *item);
+void  entity_equipment_unset_neck(Entity *self);
+Item *entity_equipment_get_torso(Entity const *self);
+void  entity_equipment_set_torso(Entity *self, char const *item);
+void  entity_equipment_unset_torso(Entity *self);
+Item *entity_equipment_get_legs(Entity const *self);
+void  entity_equipment_set_legs(Entity *self, char const *item);
+void  entity_equipment_unset_legs(Entity *self);
+Item *entity_equipment_get_left_foot(Entity const *self);
+void  entity_equipment_set_left_foot(Entity *self, char const *item);
+void  entity_equipment_unset_left_foot(Entity *self);
+Item *entity_equipment_get_right_foot(Entity const *self);
+void  entity_equipment_set_right_foot(Entity *self, char const *item);
+void  entity_equipment_unset_right_foot(Entity *self);
+Item *entity_equipment_get_left_hand(Entity const *self);
+void  entity_equipment_set_left_hand(Entity *self, char const *item);
+void  entity_equipment_unset_left_hand(Entity *self);
+Item *entity_equipment_get_right_hand(Entity const *self);
+void  entity_equipment_set_right_hand(Entity *self, char const *item);
+void  entity_equipment_unset_right_hand(Entity *self);
+
 // Perks methods
 size_t      entity_perks_count(Entity const *);
 void        entity_perks_add(Entity *, Perk *);

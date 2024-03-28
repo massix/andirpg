@@ -47,10 +47,16 @@
     return self->_##prop_name;                              \
   }
 
-// This can be a compile-time constant?
-#ifndef MAX_INVENTORY_SIZE
-#define MAX_INVENTORY_SIZE 1024
-#endif
+typedef struct Equipment {
+  Item *_head;
+  Item *_neck;
+  Item *_torso;
+  Item *_left_hand;
+  Item *_right_hand;
+  Item *_legs;
+  Item *_left_foot;
+  Item *_right_foot;
+} Equipment;
 
 struct Entity {
   uint32_t    _lp;
@@ -69,7 +75,126 @@ struct Entity {
   Point      *_coords;
   Item      **_inventory;
   LinkedList *_perks;
+  Equipment  *_equipment;
 };
+
+Equipment *equipment_new() {
+  Equipment *self = calloc(1, sizeof(Equipment));
+  self->_head = nullptr;
+  self->_neck = nullptr;
+  self->_torso = nullptr;
+  self->_left_hand = nullptr;
+  self->_right_hand = nullptr;
+  self->_legs = nullptr;
+  self->_left_foot = nullptr;
+  self->_right_foot = nullptr;
+
+  return self;
+}
+
+void equipment_free(Equipment *self) {
+#define free_nonnull(p) \
+  if ((p) != nullptr)   \
+    item_free(p);
+
+  free_nonnull(self->_head);
+  free_nonnull(self->_neck);
+  free_nonnull(self->_torso);
+  free_nonnull(self->_left_hand);
+  free_nonnull(self->_right_hand);
+  free_nonnull(self->_legs);
+  free_nonnull(self->_left_foot);
+  free_nonnull(self->_right_foot);
+}
+
+void equipment_serialize(Equipment const *self, msgpack_sbuffer *buffer) {
+  msgpack_packer *packer = msgpack_packer_new(buffer, &msgpack_sbuffer_write);
+  msgpack_pack_map(packer, 8);
+
+#define serialize_part(part)               \
+  serde_pack_str(packer, #part);           \
+  if (self->_##part != nullptr)            \
+    item_serialize(self->_##part, buffer); \
+  else                                     \
+    msgpack_pack_nil(packer);
+
+  serialize_part(head);
+  serialize_part(neck);
+  serialize_part(torso);
+  serialize_part(left_hand);
+  serialize_part(right_hand);
+  serialize_part(legs);
+  serialize_part(left_foot);
+  serialize_part(right_foot);
+
+  msgpack_packer_free(packer);
+}
+
+Equipment *equipment_deserialize(msgpack_object_map const *map) {
+  assert(map->size == 8);
+
+  Equipment *self = equipment_new();
+
+#define deserialize_part(part)                                       \
+  msgpack_object_kv const *kv_##part = serde_map_find_l(map, #part); \
+  if (kv_##part->val.type == MSGPACK_OBJECT_MAP) {                   \
+    self->_##part = item_deserialize(&kv_##part->val.via.map);       \
+  }
+
+  deserialize_part(head);
+  deserialize_part(neck);
+  deserialize_part(torso);
+  deserialize_part(left_hand);
+  deserialize_part(right_hand);
+  deserialize_part(legs);
+  deserialize_part(left_foot);
+  deserialize_part(right_foot);
+
+  return self;
+}
+
+#define EQUIPMENT_GETTER(part)                        \
+  Item *equipment_get_##part(Equipment const *self) { \
+    return self->_##part;                             \
+  }
+
+#define EQUIPMENT_SETTER(part)                             \
+  void equipment_set_##part(Equipment *self, Item *item) { \
+    self->_##part = item;                                  \
+  }
+
+#define EQUIPMENT_CLEARER(part)                  \
+  void equipment_clear_##part(Equipment *self) { \
+    if (self->_##part != nullptr) {              \
+      item_free(self->_##part);                  \
+      self->_##part = nullptr;                   \
+    }                                            \
+  }
+
+EQUIPMENT_GETTER(head);
+EQUIPMENT_SETTER(head);
+EQUIPMENT_CLEARER(head);
+EQUIPMENT_GETTER(neck);
+EQUIPMENT_SETTER(neck);
+EQUIPMENT_CLEARER(neck);
+EQUIPMENT_GETTER(torso);
+EQUIPMENT_SETTER(torso);
+EQUIPMENT_CLEARER(torso);
+EQUIPMENT_GETTER(left_hand);
+EQUIPMENT_SETTER(left_hand);
+EQUIPMENT_CLEARER(left_hand);
+EQUIPMENT_GETTER(right_hand);
+EQUIPMENT_SETTER(right_hand);
+EQUIPMENT_CLEARER(right_hand);
+EQUIPMENT_GETTER(legs);
+EQUIPMENT_SETTER(legs);
+EQUIPMENT_CLEARER(legs);
+EQUIPMENT_GETTER(left_foot);
+EQUIPMENT_SETTER(left_foot);
+EQUIPMENT_CLEARER(left_foot);
+EQUIPMENT_GETTER(right_foot);
+EQUIPMENT_SETTER(right_foot);
+EQUIPMENT_CLEARER(right_foot);
 
 EntityBuilder *eb_with_type(EntityBuilder *self, EntityType type) {
   self->type = type;
@@ -159,6 +284,7 @@ Entity *eb_build(EntityBuilder *self, bool oneshot) {
   ent->_inventory = calloc(1, sizeof(Item *));
   ent->_inventory[0] = nullptr;
   ent->_perks = linked_list_new(32, (FreeFunction)&perk_free);
+  ent->_equipment = equipment_new();
 
   if (oneshot) {
     entity_builder_free(self);
@@ -229,7 +355,7 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   LOG_INFO("Unmarshalling entity", 0);
   LOG_INFO("Validating map", 0);
 
-  assert(map->size == 16);
+  assert(map->size == 17);
 
 #define sma(t, f) serde_map_assert(map, MSGPACK_OBJECT_##t, f);
 
@@ -247,6 +373,7 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   sma(POSITIVE_INTEGER, "type");
   sma(STR, "name");
   sma(ARRAY, "coords");
+  sma(MAP, "equipment");
   sma(ARRAY, "inventory");
   sma(ARRAY, "perks");
 
@@ -294,6 +421,9 @@ Entity *entity_deserialize(msgpack_object_map const *map) {
   entity->_name = calloc(name_ptr->size, sizeof(char));
   memcpy(entity->_name, name_ptr->ptr, name_ptr->size);
 
+  msgpack_object_map const *equipment = serde_map_get(map, MSGPACK_OBJECT_MAP, "equipment");
+  entity->_equipment = equipment_deserialize(equipment);
+
   msgpack_object_array const *inventory = serde_map_get(map, MSGPACK_OBJECT_ARRAY, "inventory");
 
   entity->_inventory = calloc(inventory->size + 1 /* for the null pointer */, sizeof(Item *));
@@ -315,7 +445,7 @@ void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
   msgpack_packer packer;
   msgpack_packer_init(&packer, buffer, &msgpack_sbuffer_write);
 
-  msgpack_pack_map(&packer, 16);
+  msgpack_pack_map(&packer, 17);
 
 #define PACK_UINT(t, s)        \
   serde_pack_str(&packer, #t); \
@@ -342,6 +472,9 @@ void entity_serialize(Entity const *ent, msgpack_sbuffer *buffer) {
   msgpack_pack_uint32(&packer, point_get_x(ent->_coords));
   msgpack_pack_uint32(&packer, point_get_y(ent->_coords));
 
+  serde_pack_str(&packer, "equipment");
+  equipment_serialize(ent->_equipment, buffer);
+
   serde_pack_str(&packer, "inventory");
   uint32_t inventory_count = entity_inventory_count(ent);
   msgpack_pack_array(&packer, inventory_count);
@@ -365,8 +498,8 @@ void entity_free(Entity *entity) {
   entity_inventory_clear(entity);
   free(entity->_inventory);
 
-  entity_perks_clear(entity);
-  free(entity->_perks);
+  linked_list_free(entity->_perks);
+  equipment_free(entity->_equipment);
 
   free(entity);
 }
@@ -588,6 +721,234 @@ Item **entity_inventory_filter(Entity *entity, bool (*filter_function)(Item cons
 
 inline Item **entity_inventory_get(Entity const *entity) {
   return entity->_inventory;
+}
+
+// Private method
+Item *entity_inventory_pop(Entity *self, char const *name, ItemType type) {
+  uint  index = 0;
+  Item *new_item = nullptr;
+
+  Item const *iterator = self->_inventory[index];
+  while (iterator != nullptr) {
+    if (strings_equal(item_get_name(iterator), name) && item_get_type(iterator) == type) {
+      break;
+    }
+
+    iterator = self->_inventory[++index];
+  }
+
+  if (iterator != nullptr) {
+    new_item = item_clone(iterator);
+    entity_inventory_remove_item(self, name);
+  }
+
+  return new_item;
+}
+
+Item *entity_equipment_get_head(Entity const *self) {
+  return equipment_get_head(self->_equipment);
+}
+
+void entity_equipment_set_head(Entity *self, char const *item) {
+  if (entity_equipment_get_head(self) != nullptr) {
+    return;
+  }
+
+  Item *head_gear = entity_inventory_pop(self, item, ARMOR);
+
+  if (head_gear != nullptr) {
+    equipment_set_head(self->_equipment, head_gear);
+  }
+}
+
+void entity_equipment_unset_head(Entity *self) {
+  Item const *head_gear = equipment_get_head(self->_equipment);
+  if (head_gear != nullptr) {
+    entity_inventory_add_item(self, item_clone(head_gear));
+    equipment_clear_head(self->_equipment);
+  }
+}
+
+Item *entity_equipment_get_neck(Entity const *self) {
+  return equipment_get_neck(self->_equipment);
+}
+
+void entity_equipment_set_neck(Entity *self, char const *item) {
+  if (entity_equipment_get_neck(self) != nullptr) {
+    return;
+  }
+
+  Item *neck_gear = entity_inventory_pop(self, item, ARMOR);
+
+  if (neck_gear != nullptr) {
+    equipment_set_neck(self->_equipment, neck_gear);
+  }
+}
+
+void entity_equipment_unset_neck(Entity *self) {
+  Item const *neck_gear = equipment_get_neck(self->_equipment);
+  if (neck_gear != nullptr) {
+    entity_inventory_add_item(self, item_clone(neck_gear));
+    equipment_clear_neck(self->_equipment);
+  }
+}
+
+Item *entity_equipment_get_torso(Entity const *self) {
+  return equipment_get_torso(self->_equipment);
+}
+
+void entity_equipment_set_torso(Entity *self, char const *item) {
+  if (entity_equipment_get_torso(self) != nullptr) {
+    return;
+  }
+
+  Item *torso_gear = entity_inventory_pop(self, item, ARMOR);
+
+  if (torso_gear != nullptr) {
+    equipment_set_torso(self->_equipment, torso_gear);
+  }
+}
+
+void entity_equipment_unset_torso(Entity *self) {
+  Item const *torso_gear = equipment_get_torso(self->_equipment);
+  if (torso_gear != nullptr) {
+    entity_inventory_add_item(self, item_clone(torso_gear));
+    equipment_clear_torso(self->_equipment);
+  }
+}
+
+Item *entity_equipment_get_legs(Entity const *self) {
+  return equipment_get_legs(self->_equipment);
+}
+
+void entity_equipment_set_legs(Entity *self, char const *item) {
+  if (entity_equipment_get_legs(self) != nullptr) {
+    return;
+  }
+
+  Item *legs_gear = entity_inventory_pop(self, item, ARMOR);
+
+  if (legs_gear != nullptr) {
+    equipment_set_legs(self->_equipment, legs_gear);
+  }
+}
+
+void entity_equipment_unset_legs(Entity *self) {
+  Item const *legs_gear = equipment_get_legs(self->_equipment);
+  if (legs_gear != nullptr) {
+    entity_inventory_add_item(self, item_clone(legs_gear));
+    equipment_clear_legs(self->_equipment);
+  }
+}
+
+Item *entity_equipment_get_left_foot(Entity const *self) {
+  return equipment_get_left_foot(self->_equipment);
+}
+
+void entity_equipment_set_left_foot(Entity *self, char const *item) {
+  if (entity_equipment_get_left_foot(self) != nullptr) {
+    return;
+  }
+
+  Item *left_foot_gear = entity_inventory_pop(self, item, ARMOR);
+
+  if (left_foot_gear != nullptr) {
+    equipment_set_left_foot(self->_equipment, left_foot_gear);
+  }
+}
+
+void entity_equipment_unset_left_foot(Entity *self) {
+  Item const *left_foot_gear = equipment_get_left_foot(self->_equipment);
+  if (left_foot_gear != nullptr) {
+    entity_inventory_add_item(self, item_clone(left_foot_gear));
+    equipment_clear_left_foot(self->_equipment);
+  }
+}
+
+Item *entity_equipment_get_right_foot(Entity const *self) {
+  return equipment_get_right_foot(self->_equipment);
+}
+
+void entity_equipment_set_right_foot(Entity *self, char const *item) {
+  if (entity_equipment_get_right_foot(self) != nullptr) {
+    return;
+  }
+
+  Item *right_foot_gear = entity_inventory_pop(self, item, ARMOR);
+
+  if (right_foot_gear != nullptr) {
+    equipment_set_right_foot(self->_equipment, right_foot_gear);
+  }
+}
+
+void entity_equipment_unset_right_foot(Entity *self) {
+  Item const *right_foot_gear = equipment_get_right_foot(self->_equipment);
+  if (right_foot_gear != nullptr) {
+    entity_inventory_add_item(self, item_clone(right_foot_gear));
+    equipment_clear_right_foot(self->_equipment);
+  }
+}
+
+Item *entity_equipment_get_right_hand(Entity const *self) {
+  return equipment_get_right_hand(self->_equipment);
+}
+
+void entity_equipment_set_right_hand(Entity *self, char const *item) {
+  // Must check if left hand is two-handed weapon first
+  Item const *left_hand_gear = equipment_get_left_hand(self->_equipment);
+  if (left_hand_gear != nullptr && weapon_get_hands(item_get_properties(left_hand_gear)) == 2) {
+    LOG_WARNING("Already equipping a two-handed weapon in left hand, cannot equip right hand", 0);
+    return;
+  }
+
+  if (entity_equipment_get_right_hand(self) != nullptr) {
+    LOG_WARNING("Cannot equip '%s' as right hand already equipped", item);
+    return;
+  }
+
+  Item *right_hand_gear = entity_inventory_pop(self, item, WEAPON);
+
+  if (right_hand_gear != nullptr) {
+    if (weapon_get_hands(item_get_properties(right_hand_gear)) == 2) {
+      LOG_WARNING("Trying to set item '%s' which is two-handed in right hand", item);
+      entity_inventory_add_item(self, right_hand_gear);
+      entity_equipment_set_left_hand(self, item);
+    } else {
+      equipment_set_right_hand(self->_equipment, right_hand_gear);
+    }
+  }
+}
+
+void entity_equipment_unset_right_hand(Entity *self) {
+  Item const *right_hand_gear = equipment_get_right_hand(self->_equipment);
+  if (right_hand_gear != nullptr) {
+    entity_inventory_add_item(self, item_clone(right_hand_gear));
+    equipment_clear_right_hand(self->_equipment);
+  }
+}
+
+Item *entity_equipment_get_left_hand(Entity const *self) {
+  return equipment_get_left_hand(self->_equipment);
+}
+
+void entity_equipment_set_left_hand(Entity *self, char const *item) {
+  if (entity_equipment_get_left_hand(self) != nullptr) {
+    return;
+  }
+
+  Item *left_hand_gear = entity_inventory_pop(self, item, WEAPON);
+
+  if (left_hand_gear != nullptr) {
+    equipment_set_left_hand(self->_equipment, left_hand_gear);
+  }
+}
+
+void entity_equipment_unset_left_hand(Entity *self) {
+  Item const *left_hand_gear = equipment_get_left_hand(self->_equipment);
+  if (left_hand_gear != nullptr) {
+    entity_inventory_add_item(self, item_clone(left_hand_gear));
+    equipment_clear_left_hand(self->_equipment);
+  }
 }
 
 size_t entity_perks_count(const Entity *self) {

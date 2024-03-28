@@ -23,6 +23,7 @@
 #include "logger.h"
 #include "point.h"
 #include "serde.h"
+#include "utils.h"
 #include <assert.h>
 #include <msgpack/object.h>
 #include <msgpack/pack.h>
@@ -498,5 +499,45 @@ void forage_serialize(Item const *item, msgpack_packer *packer) {
 void gem_serialize(Item const *item, msgpack_packer *packer) {
   LOG_WARNING("Gem items not implemented yet, cannot pack it", 0);
   msgpack_pack_nil(packer);
+}
+
+bool weapon_is_equal(WeaponProperties const *self, WeaponProperties const *other) {
+  return self->_hands == other->_hands && self->_attack_power == other->_attack_power && self->_life_points == other->_life_points;
+}
+
+bool tool_is_equal(ToolProperties const *self, ToolProperties const *other) {
+  return self->_hands == other->_hands && self->_life_points == other->_life_points;
+}
+
+bool armor_is_equal(ArmorProperties const *self, ArmorProperties const *other) {
+  return self->_defense_value == other->_defense_value && self->_life_points == other->_life_points &&
+         self->_armor_class == other->_armor_class;
+}
+
+bool item_is_equal(Item const *self, Item const *other) {
+  assert(self != nullptr && other != nullptr);
+  bool name_equal = strings_equal(item_get_name(self), item_get_name(other));
+  bool type_equal = item_get_type(self) == item_get_type(other);
+  bool base_equal = self->_value == other->_value && self->_weight == other->_weight;
+  bool props_equal = false;
+
+  if (type_equal && name_equal && base_equal) {
+    switch (item_get_type(self)) {
+      case ARMOR:
+        props_equal = armor_is_equal(item_get_properties(self), item_get_properties(other));
+        break;
+      case WEAPON:
+        props_equal = weapon_is_equal(item_get_properties(self), item_get_properties(other));
+        break;
+      case TOOL:
+        props_equal = tool_is_equal(item_get_properties(self), item_get_properties(other));
+        break;
+      default:
+        props_equal = true;
+        break;
+    }
+  }
+
+  return name_equal && type_equal && base_equal && props_equal;
 }
 
